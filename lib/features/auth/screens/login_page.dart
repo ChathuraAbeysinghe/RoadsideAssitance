@@ -92,13 +92,16 @@ class _LoginPageState extends State<LoginPage> {
                 child: Text(
                   'Please Enter Your Mobile Number',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                'We will send you a verification code to this number',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              Center(
+                child: Text(
+                  'We will send you a verification code to this number',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                ),
               ),
               const SizedBox(height: 24),
               IntlPhoneField(
