@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "538286848761",
+    "project_id": "roadside-assistance-45a37",
+    "storage_bucket": "roadside-assistance-45a37.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:538286848761:android:5cd61ff9a71abb990bc028",
+        "android_client_info": {
+          "package_name": "com.example.roadside_assitance"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIyFBxWwVJLa8Ei1fhK28elVlZ5Hbyiow"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
