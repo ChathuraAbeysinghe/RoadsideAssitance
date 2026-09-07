@@ -44,6 +44,12 @@ class _OtpVerificationState extends State<OtpVerification> {
     });
   }
 
+  String get _formattedTime {
+    final minutes = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
+    final seconds = (_secondsLeft % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
   Future<void> _onResend() async {
     setState(() => _isLoading = true);
     await widget.authDataSource.sendOtp(
@@ -115,42 +121,89 @@ class _OtpVerificationState extends State<OtpVerification> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 8),
-              IconButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.chevron_left),
-                style: IconButton.styleFrom(
-                  side: BorderSide(color: Colors.grey.shade300),
-                  shape: const CircleBorder(),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Center(
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  height: 100,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.local_shipping,
-                    size: 80,
-                    color: Colors.black87,
+              Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(Icons.chevron_left),
+                  style: IconButton.styleFrom(
+                    side: BorderSide(color: Colors.grey.shade300),
+                    shape: const CircleBorder(),
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
-              const Text(
-                'Enter Verification Code',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'We sent a 6-digit code to ${widget.phoneNumber}',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              const SizedBox(height: 24),
+
+              // Logo
+              Image.asset(
+                'assets/images/logo.png',
+                height: 110,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.local_shipping,
+                  size: 90,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 32),
 
-              // OTP input boxes (pin_code_fields v9 API)
+              // Title
+              const Text(
+                'Verify via Message',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+
+              // Subtitle: "Please enter 6 Digit OTP sent via SMS to"
+              RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  style: TextStyle(fontSize: 15, color: Colors.grey.shade700),
+                  children: const [
+                    TextSpan(text: 'Please enter 6 Digit OTP sent via '),
+                    TextSpan(
+                      text: 'SMS',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    TextSpan(text: ' to'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+
+              // Phone number + Change link
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.phoneNumber,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    child: const Text(
+                      'Change',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color.fromARGB(255, 43, 113, 182),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // OTP input boxes
               MaterialPinField(
                 length: 6,
                 onCompleted: (pin) {
@@ -159,38 +212,68 @@ class _OtpVerificationState extends State<OtpVerification> {
                 onChanged: (value) {
                   _enteredCode = value;
                 },
-                                theme: MaterialPinTheme(
+                theme: MaterialPinTheme(
                   shape: MaterialPinShape.outlined,
                   cellSize: const Size(44, 52),
+                  spacing: 12,
                   borderRadius: BorderRadius.circular(12),
-                  borderColor: Colors.grey.shade300,
-                  focusedBorderColor: const Color(0xFFE30613),
-                  filledBorderColor: Colors.black,
+                  borderColor: Colors.grey.shade400,
+                  focusedBorderColor: const Color.fromARGB(255, 0, 0, 0),
+                  filledBorderColor: const Color(0xFF969697),
+                  fillColor: Colors.white,
+                  focusedFillColor: Colors.white,
+                  filledFillColor: Colors.white,
+                  cursorColor: Colors.black,
                 ),
               ),
               const SizedBox(height: 24),
 
-              Center(
-                child: _secondsLeft > 0
-                    ? Text(
-                        'Resend code in $_secondsLeft s',
-                        style: TextStyle(
+              // Resend row
+              _secondsLeft > 0
+                  ? RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: const TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          color: Colors.black,
                         ),
-                      )
-                    : TextButton(
-                        onPressed: _isLoading ? null : _onResend,
-                        child: const Text(
-                          'Resend Code',
-                          style: TextStyle(
-                            color: Color(0xFFE30613),
-                            fontWeight: FontWeight.bold,
+                        children: [
+                          const TextSpan(
+                            text: "If you didn't receive a code. ",
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
+                          TextSpan(
+                            text: 'Resend in $_formattedTime Seconds',
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    )
+                  : GestureDetector(
+                      onTap: _isLoading ? null : _onResend,
+                      child: RichText(
+                        textAlign: TextAlign.center,
+                        text: const TextSpan(
+                          style: TextStyle(fontSize: 14, color: Colors.black),
+                          children: [
+                            TextSpan(
+                              text: "Didn't receive a code? ",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            TextSpan(
+                              text: 'Resend Code',
+                              style: TextStyle(
+                                color: Color(0xFFE30613),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-              ),
+                    ),
               const SizedBox(height: 32),
+
+              // Verify button
               SizedBox(
                 width: double.infinity,
                 height: 56,
