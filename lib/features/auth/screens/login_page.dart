@@ -88,9 +88,12 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 32),
-              const Text(
-                'Please Enter Your Mobile Number',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              const Center(
+                child: Text(
+                  'Please Enter Your Mobile Number',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -100,6 +103,7 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 24),
               IntlPhoneField(
                 decoration: InputDecoration(
+                  counterText: '',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: Colors.black),
