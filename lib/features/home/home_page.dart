@@ -214,7 +214,10 @@ class HomePage extends StatelessWidget {
             ),
 
             // Bottom navigation bar
-            _BottomNavBar(),
+            SafeArea(
+              top: false,
+              child: _BottomNavBar(),
+            ),
           ],
         ),
       ),
