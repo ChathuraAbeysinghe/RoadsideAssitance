@@ -44,7 +44,7 @@ class _HomePageState extends State<HomePage> {
       _currentHeroPage = (_currentHeroPage + 1) % _heroImages.length;
       _heroController.animateToPage(
         _currentHeroPage,
-        duration: const Duration(milliseconds: 500),
+        duration: const Duration(milliseconds: 1000),
         curve: Curves.easeInOut,
       );
     });
@@ -60,217 +60,259 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // Fixed header and search bar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color.fromARGB(84, 165, 164, 164),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.centerRight,
+            colors: [
+              Color.fromARGB(255, 255, 158, 2),
+              Color.fromARGB(255, 255, 225, 1),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // Fixed header and search bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color.fromARGB(255, 0, 0, 0),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.person_outline,
+                        color: const Color.fromARGB(255, 0, 0, 0),
                       ),
                     ),
-                    child: Icon(
-                      Icons.person_outline,
-                      color: const Color.fromARGB(151, 117, 117, 117),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'Hi ${widget.userName}\n$_greeting',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          height: 1.3,
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'Hi ${widget.userName}\n$_greeting',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            height: 1.3,
+                            color: Color.fromARGB(255, 0, 0, 0),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Icon(
-                    Icons.notifications_none,
-                    size: 26,
-                    color: Colors.black87,
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                height: 52,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.grey.shade300),
+                    Icon(
+                      Icons.notifications_none,
+                      size: 26,
+                      color: Colors.black87,
+                    ),
+                  ],
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.search, color: Colors.grey.shade500),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Search Here',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey.shade500,
+              ),
+              Expanded(
+                child: Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(40),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -3),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-            Expanded(
-              child: Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(40),
+                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, -3),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 90),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Auto-rotating hero carousel (changes image every 5 seconds).
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: SizedBox(
-                                height: 210,
-                                width: double.infinity,
-                                child: PageView.builder(
-                                  controller: _heroController,
-                                  itemCount: _heroImages.length,
-                                  onPageChanged: (index) {
-                                    _currentHeroPage = index;
-                                  },
-                                  itemBuilder: (context, index) {
-                                    return Image.asset(
-                                      _heroImages[index],
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              Container(
-                                                color: const Color(0xFFE30613),
-                                              ),
-                                    );
-                                  },
+                  child: Stack(
+                    children: [
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.only(bottom: 90),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                              child: Container(
+                                height: 52,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.search,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Search Here',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 28),
+                            const SizedBox(height: 20),
 
-                          // Emergency Services section
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  'Emergency Services',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
+                            // Auto-rotating hero carousel (changes image every 5 seconds).
+                            // Auto-rotating hero carousel (changes image every 5 seconds).
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.2,
+                                      ),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: SizedBox(
+                                    height: 210,
+                                    width: double.infinity,
+                                    child: PageView.builder(
+                                      controller: _heroController,
+                                      itemCount: _heroImages.length,
+                                      onPageChanged: (index) {
+                                        _currentHeroPage = index;
+                                      },
+                                      itemBuilder: (context, index) {
+                                        return Image.asset(
+                                          _heroImages[index],
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  Container(
+                                                    color: const Color(
+                                                      0xFFE30613,
+                                                    ),
+                                                  ),
+                                        );
+                                      },
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 20),
-
-                                // Row 1: two bigger cards
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _ServiceItem(
-                                        label: 'Vehicle Tow',
-                                        imagePath: 'assets/images/towing.png',
-                                        height: 130,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: _ServiceItem(
-                                        label: 'Request Mechanic',
-                                        imagePath: 'assets/images/mechanic.png',
-                                        height: 130,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 20),
-
-                                // Row 2: three smaller cards
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _ServiceItem(
-                                        label: 'Request Fuel',
-                                        imagePath:
-                                            'assets/images/outoffuel.png',
-                                        height: 80,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: _ServiceItem(
-                                        label: 'Flat Tire',
-                                        imagePath: 'assets/images/flattire.png',
-                                        height: 80,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: _ServiceItem(
-                                        label: 'Jump Start',
-                                        imagePath:
-                                            'assets/images/jumpstart.png',
-                                        height: 80,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 32),
-                              ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
+                            const SizedBox(height: 28),
 
-                    // Bottom navigation bar overlays the scrollable content.
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: SafeArea(top: false, child: _BottomNavBar()),
-                    ),
-                  ],
+                            // Emergency Services section
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    'Emergency Services',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Row 1: two bigger cards
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _ServiceItem(
+                                          label: 'Vehicle Tow',
+                                          imagePath: 'assets/images/towing.png',
+                                          height: 130,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: _ServiceItem(
+                                          label: 'Request Mechanic',
+                                          imagePath:
+                                              'assets/images/mechanic.png',
+                                          height: 130,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Row 2: three smaller cards
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _ServiceItem(
+                                          label: 'Request Fuel',
+                                          imagePath:
+                                              'assets/images/outoffuel.png',
+                                          height: 80,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: _ServiceItem(
+                                          label: 'Flat Tire',
+                                          imagePath:
+                                              'assets/images/flattire.png',
+                                          height: 80,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: _ServiceItem(
+                                          label: 'Jump Start',
+                                          imagePath:
+                                              'assets/images/jumpstart.png',
+                                          height: 80,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 32),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Bottom navigation bar overlays the scrollable content.
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: SafeArea(top: false, child: _BottomNavBar()),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
