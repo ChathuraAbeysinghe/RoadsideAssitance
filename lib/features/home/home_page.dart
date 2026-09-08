@@ -15,8 +15,8 @@ class _HomePageState extends State<HomePage> {
   // Add / remove image paths here — the carousel adapts to however many you put.
   final List<String> _heroImages = const [
     'assets/images/hero.png',
-    'assets/images/hero2.png',
-    'assets/images/hero3.png',
+    'assets/images/autoshop.jpg',
+    'assets/images/hero.png',
   ];
 
   late final PageController _heroController;
@@ -193,7 +193,7 @@ class _HomePageState extends State<HomePage> {
                                 child: _ServiceItem(
                                   label: 'Vehicle Tow',
                                   imagePath: 'assets/images/towing.png',
-                                  height: 150,
+                                  height: 130,
                                 ),
                               ),
                               const SizedBox(width: 14),
@@ -201,7 +201,7 @@ class _HomePageState extends State<HomePage> {
                                 child: _ServiceItem(
                                   label: 'Request Mechanic',
                                   imagePath: 'assets/images/mechanic.png',
-                                  height: 150,
+                                  height: 130,
                                 ),
                               ),
                             ],
@@ -215,7 +215,7 @@ class _HomePageState extends State<HomePage> {
                                 child: _ServiceItem(
                                   label: 'Request Fuel',
                                   imagePath: 'assets/images/outoffuel.png',
-                                  height: 110,
+                                  height: 80,
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -223,7 +223,7 @@ class _HomePageState extends State<HomePage> {
                                 child: _ServiceItem(
                                   label: 'Flat Tire',
                                   imagePath: 'assets/images/flattire.png',
-                                  height: 110,
+                                  height: 80,
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -231,7 +231,7 @@ class _HomePageState extends State<HomePage> {
                                 child: _ServiceItem(
                                   label: 'Jump Start',
                                   imagePath: 'assets/images/jumpstart.png',
-                                  height: 110,
+                                  height: 80,
                                 ),
                               ),
                             ],
@@ -267,33 +267,47 @@ class _ServiceItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Image.asset(
-            imagePath,
-            height: height,
-            width: double.infinity,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => Container(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Image.asset(
+              imagePath,
               height: height,
               width: double.infinity,
-              color: Colors.grey.shade300,
-              child: const Icon(
-                Icons.image_not_supported_outlined,
-                color: Colors.grey,
+              fit: BoxFit.fitWidth,
+              errorBuilder: (context, error, stackTrace) => Container(
+                height: height,
+                width: double.infinity,
+                color: Colors.grey.shade300,
+                child: const Icon(
+                  Icons.image_not_supported_outlined,
+                  color: Colors.grey,
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     );
   }
 }
