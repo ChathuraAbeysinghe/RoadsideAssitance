@@ -157,7 +157,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       SingleChildScrollView(
-                        padding: const EdgeInsets.only(bottom: 90),
+                        padding: const EdgeInsets.only(bottom: 120),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -324,7 +324,7 @@ class _HomePageState extends State<HomePage> {
                       // Bottom navigation bar overlays the scrollable content.
                       Align(
                         alignment: Alignment.bottomCenter,
-                        child: SafeArea(top: false, child: _BottomNavBar()),
+                        child: _BottomNavBar(),
                       ),
                     ],
                   ),
@@ -399,8 +399,12 @@ class _ServiceItem extends StatelessWidget {
 class _BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      width: double.infinity,
+      height: 86 + bottomInset,
+      padding: EdgeInsets.only(top: 10, bottom: bottomInset),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -415,6 +419,7 @@ class _BottomNavBar extends StatelessWidget {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: const [
           _NavItem(
             label: 'Home',
