@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-import 'features/auth/firebase_options.dart';
+import 'firebase_options.dart';
 import 'features/auth/screens/login_page.dart';
+import 'features/home/home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +24,8 @@ class MyApp extends StatelessWidget {
           seedColor: const Color.fromARGB(255, 234, 5, 5),
         ),
       ),
-      home: const LoginPage(),
+      //home: const LoginPage(),
+      home: const HomePage(),
     );
   }
 }

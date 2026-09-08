@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../app_user.dart';
+
+import '../../../entities/app_user.dart';
+import '../../home/home_page.dart';
 
 class CompleteProfilePage extends StatefulWidget {
   final String uid;
@@ -23,14 +25,16 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
   Future<void> _onSubmit() async {
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your name')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter your name')));
       return;
     }
     if (_selectedRole == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select whether you are a driver or mechanic')),
+        const SnackBar(
+          content: Text('Please select whether you are a driver or mechanic'),
+        ),
       );
       return;
     }
@@ -51,14 +55,22 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
     if (!mounted) return;
 
-    // TODO: replace with your real DriverHomePage / MechanicHomePage
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: Text('${_selectedRole!.name} home')),
+    Widget destination;
+    switch (_selectedRole!) {
+      case UserRole.driver:
+        destination = HomePage(userName: user.name);
+        break;
+      case UserRole.mechanic:
+        // TODO: replace with your real MechanicHomePage once it exists.
+        destination = Scaffold(
+          appBar: AppBar(title: const Text('Mechanic home')),
           body: Center(child: Text('Welcome, ${user.name}!')),
-        ),
-      ),
+        );
+        break;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => destination),
       (route) => false,
     );
   }
@@ -111,9 +123,21 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: _roleCard(UserRole.driver, 'Driver', Icons.directions_car)),
+                  Expanded(
+                    child: _roleCard(
+                      UserRole.driver,
+                      'Driver',
+                      Icons.directions_car,
+                    ),
+                  ),
                   const SizedBox(width: 16),
-                  Expanded(child: _roleCard(UserRole.mechanic, 'Mechanic', Icons.build)),
+                  Expanded(
+                    child: _roleCard(
+                      UserRole.mechanic,
+                      'Mechanic',
+                      Icons.build,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 40),
@@ -167,11 +191,19 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
             color: isSelected ? const Color(0xFFE30613) : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
           ),
-          color: isSelected ? const Color(0xFFE30613).withValues(alpha: 0.05) : Colors.white,
+          color: isSelected
+              ? const Color(0xFFE30613).withValues(alpha: 0.05)
+              : Colors.white,
         ),
         child: Column(
           children: [
-            Icon(icon, size: 32, color: isSelected ? const Color(0xFFE30613) : Colors.grey.shade600),
+            Icon(
+              icon,
+              size: 32,
+              color: isSelected
+                  ? const Color(0xFFE30613)
+                  : Colors.grey.shade600,
+            ),
             const SizedBox(height: 8),
             Text(
               label,
