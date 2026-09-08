@@ -41,11 +41,13 @@ class HomePage extends StatelessWidget {
                     height: 48,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(
+                        color: const Color.fromARGB(84, 165, 164, 164),
+                      ),
                     ),
                     child: Icon(
                       Icons.person_outline,
-                      color: Colors.grey.shade600,
+                      color: const Color.fromARGB(151, 117, 117, 117),
                     ),
                   ),
                 ],
@@ -57,7 +59,7 @@ class HomePage extends StatelessWidget {
               child: Stack(
                 children: [
                   SizedBox(
-                    height: 260,
+                    height: 210,
                     width: double.infinity,
                     child: Image.asset(
                       'assets/images/hero.png',
@@ -105,9 +107,21 @@ class HomePage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 260),
+                        const SizedBox(height: 190),
                         Container(
-                          color: Colors.white,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(28),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color(0x26000000),
+                                blurRadius: 14,
+                                offset: Offset(0, -4),
+                              ),
+                            ],
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -115,95 +129,98 @@ class HomePage extends StatelessWidget {
 
                               // "What do you need help with?" section
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                          const Text(
-                            'What do you need help with?',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
+                                    const Text(
+                                      'What do you need help with?',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
 
-                          // Row 1: two bigger cards
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _ServiceItem(
-                                  label: 'Car Towing',
-                                  imagePath: 'assets/images/hero.png',
-                                  height: 150,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: _ServiceItem(
-                                  label: 'Request Mechanic',
-                                  imagePath: 'assets/images/hero.png',
-                                  height: 150,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
+                                    // Row 1: two bigger cards
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _ServiceItem(
+                                            label: 'Car Towing',
+                                            imagePath: 'assets/images/hero.png',
+                                            height: 150,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: _ServiceItem(
+                                            label: 'Request Mechanic',
+                                            imagePath: 'assets/images/hero.png',
+                                            height: 150,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 20),
 
-                          // Row 2: three smaller cards
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _ServiceItem(
-                                  label: 'Out of Gas',
-                                  imagePath: 'assets/images/hero.png',
-                                  height: 110,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _ServiceItem(
-                                  label: 'Dead Battery',
-                                  imagePath: 'assets/images/hero.png',
-                                  height: 110,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _ServiceItem(
-                                  label: 'Flat Tire',
-                                  imagePath: 'assets/images/hero.png',
-                                  height: 110,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 32),
+                                    // Row 2: three smaller cards
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _ServiceItem(
+                                            label: 'Out of Gas',
+                                            imagePath: 'assets/images/hero.png',
+                                            height: 110,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: _ServiceItem(
+                                            label: 'Dead Battery',
+                                            imagePath: 'assets/images/hero.png',
+                                            height: 110,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: _ServiceItem(
+                                            label: 'Flat Tire',
+                                            imagePath: 'assets/images/hero.png',
+                                            height: 110,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 32),
 
-                          const Text(
-                            'Explore Nearby',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
+                                    const Text(
+                                      'Explore Nearby',
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
 
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Image.asset(
-                              'assets/images/hero.png',
-                              height: 130,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Container(
-                                    height: 130,
-                                    color: Colors.grey.shade300,
-                                  ),
-                            ),
-                          ),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Image.asset(
+                                        'assets/images/hero.png',
+                                        height: 130,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Container(
+                                                  height: 130,
+                                                  color: Colors.grey.shade300,
+                                                ),
+                                      ),
+                                    ),
                                     const SizedBox(height: 24),
                                   ],
                                 ),
@@ -219,10 +236,7 @@ class HomePage extends StatelessWidget {
             ),
 
             // Bottom navigation bar
-            SafeArea(
-              top: false,
-              child: _BottomNavBar(),
-            ),
+            SafeArea(top: false, child: _BottomNavBar()),
           ],
         ),
       ),
@@ -291,9 +305,9 @@ class _BottomNavBar extends StatelessWidget {
             iconPath: 'assets/images/home1.png',
             isActive: true,
           ),
-          _NavItem(label: 'Requests', iconPath: 'assets/images/home1.png'),
-          _NavItem(label: 'Vehicle', iconPath: 'assets/images/home1.png'),
-          _NavItem(label: 'More', iconPath: 'assets/images/home1.png'),
+          _NavItem(label: 'Requests', iconPath: 'assets/images/clipboard1.png'),
+          _NavItem(label: 'Vehicle', iconPath: 'assets/images/wheel1.png'),
+          _NavItem(label: 'More', iconPath: 'assets/images/application1.png'),
         ],
       ),
     );
