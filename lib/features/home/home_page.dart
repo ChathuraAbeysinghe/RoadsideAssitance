@@ -1,15 +1,60 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   final String userName;
 
   const HomePage({super.key, this.userName = 'Kavidu Purnamal'});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  // Add / remove image paths here — the carousel adapts to however many you put.
+  final List<String> _heroImages = const [
+    'assets/images/hero.png',
+    'assets/images/hero2.png',
+    'assets/images/hero3.png',
+  ];
+
+  late final PageController _heroController;
+  Timer? _heroTimer;
+  int _currentHeroPage = 0;
 
   String get _greeting {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good Morning';
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _heroController = PageController(initialPage: 0);
+    _startHeroTimer();
+  }
+
+  void _startHeroTimer() {
+    _heroTimer?.cancel();
+    _heroTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted || !_heroController.hasClients) return;
+      _currentHeroPage = (_currentHeroPage + 1) % _heroImages.length;
+      _heroController.animateToPage(
+        _currentHeroPage,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _heroTimer?.cancel();
+    _heroController.dispose();
+    super.dispose();
   }
 
   @override
@@ -20,226 +65,187 @@ class HomePage extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            // Fixed greeting header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Hi $userName,\n$_greeting',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color.fromARGB(84, 165, 164, 164),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.person_outline,
-                      color: const Color.fromARGB(151, 117, 117, 117),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Keep the hero behind the scrollable service sheet.
+            // Everything below this point (including the search bar) scrolls together.
             Expanded(
-              child: Stack(
-                children: [
-                  SizedBox(
-                    height: 210,
-                    width: double.infinity,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: Image.asset(
-                            'assets/images/hero.png',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(color: const Color(0xFFE30613)),
-                          ),
-                        ),
-                        Positioned(
-                          left: 20,
-                          bottom: 10,
-                          right: 20,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              const Text(
-                                '24/7 Roadside Assistance',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color.fromARGB(255, 255, 254, 254),
-                                ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Greeting header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color.fromARGB(84, 165, 164, 164),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Anywhere Across the Island',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 200),
-                        Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(28),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0x26000000),
-                                blurRadius: 14,
-                                offset: Offset(0, -4),
-                              ),
-                            ],
+                            child: Icon(
+                              Icons.person_outline,
+                              color: const Color.fromARGB(151, 117, 117, 117),
+                            ),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 8),
-
-                              // "What do you need help with?" section
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    const Text(
-                                      'Emergency Services',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 20),
-
-                                    // Row 1: two bigger cards
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: _ServiceItem(
-                                            label: 'Car Towing',
-                                            imagePath:
-                                                'assets/images/towing.png',
-                                            height: 150,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 14),
-                                        Expanded(
-                                          child: _ServiceItem(
-                                            label: 'Request Mechanic',
-                                            imagePath:
-                                                'assets/images/mechanic.png',
-                                            height: 150,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 20),
-
-                                    // Row 2: three smaller cards
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: _ServiceItem(
-                                            label: 'Out of Gas',
-                                            imagePath:
-                                                'assets/images/outoffuel.png',
-                                            height: 110,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: _ServiceItem(
-                                            label: 'Dead Battery',
-                                            imagePath:
-                                                'assets/images/jumpstart.png',
-                                            height: 110,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: _ServiceItem(
-                                            label: 'Flat Tire',
-                                            imagePath:
-                                                'assets/images/flattire.png',
-                                            height: 110,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 32),
-
-                                    const Text(
-                                      'Explore Nearby',
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: Image.asset(
-                                        'assets/images/autoshop.jpg',
-                                        height: 130,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                Container(
-                                                  height: 130,
-                                                  color: Colors.grey.shade300,
-                                                ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 24),
-                                  ],
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              child: Text(
+                                'Hi ${widget.userName}\n$_greeting',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.3,
                                 ),
                               ),
-                            ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.notifications_none,
+                            size: 26,
+                            color: Colors.black87,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Search bar
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.search, color: Colors.grey.shade500),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Search Here',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Auto-rotating hero carousel (changes image every 5 seconds)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: SizedBox(
+                          height: 210,
+                          width: double.infinity,
+                          child: PageView.builder(
+                            controller: _heroController,
+                            itemCount: _heroImages.length,
+                            onPageChanged: (index) {
+                              _currentHeroPage = index;
+                            },
+                            itemBuilder: (context, index) {
+                              return Image.asset(
+                                _heroImages[index],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(color: const Color(0xFFE30613)),
+                              );
+                            },
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 28),
+
+                    // Emergency Services section
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'Emergency Services',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Row 1: two bigger cards
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _ServiceItem(
+                                  label: 'Vehicle Tow',
+                                  imagePath: 'assets/images/towing.png',
+                                  height: 150,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: _ServiceItem(
+                                  label: 'Request Mechanic',
+                                  imagePath: 'assets/images/mechanic.png',
+                                  height: 150,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Row 2: three smaller cards
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _ServiceItem(
+                                  label: 'Request Fuel',
+                                  imagePath: 'assets/images/outoffuel.png',
+                                  height: 110,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _ServiceItem(
+                                  label: 'Flat Tire',
+                                  imagePath: 'assets/images/flattire.png',
+                                  height: 110,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _ServiceItem(
+                                  label: 'Jump Start',
+                                  imagePath: 'assets/images/jumpstart.png',
+                                  height: 110,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 32),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
-            // Bottom navigation bar
+            // Bottom navigation bar (fixed, does not scroll)
             SafeArea(top: false, child: _BottomNavBar()),
           ],
         ),
@@ -355,26 +361,4 @@ class _NavItem extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Creates a gentle upward curve on the bottom edge of the hero banner,
-/// so the white section below blends smoothly into the image.
-class _CurveClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    path.lineTo(0, size.height * 0.4);
-    path.quadraticBezierTo(
-      size.width / 2,
-      size.height * 1.4,
-      size.width,
-      size.height * 0.4,
-    );
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
