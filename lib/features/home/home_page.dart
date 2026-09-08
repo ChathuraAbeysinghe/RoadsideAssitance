@@ -151,7 +151,7 @@ class HomePage extends StatelessWidget {
                                           child: _ServiceItem(
                                             label: 'Car Towing',
                                             imagePath:
-                                                'assets/images/towing.jpg',
+                                                'assets/images/towing.png',
                                             height: 150,
                                           ),
                                         ),
@@ -175,7 +175,7 @@ class HomePage extends StatelessWidget {
                                           child: _ServiceItem(
                                             label: 'Out of Gas',
                                             imagePath:
-                                                'assets/images/outoffuel.jpg',
+                                                'assets/images/outoffuel.png',
                                             height: 110,
                                           ),
                                         ),
@@ -184,7 +184,7 @@ class HomePage extends StatelessWidget {
                                           child: _ServiceItem(
                                             label: 'Dead Battery',
                                             imagePath:
-                                                'assets/images/jumpstart.jpg',
+                                                'assets/images/jumpstart.png',
                                             height: 110,
                                           ),
                                         ),
