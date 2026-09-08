@@ -52,73 +52,73 @@ class HomePage extends StatelessWidget {
               ),
             ),
 
-            // Fixed hero banner
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                SizedBox(
-                  height: 260,
-                  width: double.infinity,
-                  child: Image.asset(
-                    'assets/images/hero.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        Container(color: const Color(0xFFE30613)),
-                  ),
-                ),
-                Positioned(
-                  left: 20,
-                  bottom: 36,
-                  right: 20,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '24/7 Roadside Assistance',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Anywhere Across the Island',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.white.withValues(alpha: 0.9),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // White curved overlay to blend into the section below
-                Positioned(
-                  bottom: -1,
-                  left: 0,
-                  right: 0,
-                  child: ClipPath(
-                    clipper: _CurveClipper(),
-                    child: Container(height: 28, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-
-            // Scrollable service content
+            // Keep the hero behind the scrollable service sheet.
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
+              child: Stack(
+                children: [
+                  SizedBox(
+                    height: 260,
+                    width: double.infinity,
+                    child: Image.asset(
+                      'assets/images/hero.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Container(color: const Color(0xFFE30613)),
+                    ),
+                  ),
+                  Positioned(
+                    left: 20,
+                    bottom: 36,
+                    right: 20,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '24/7 Roadside Assistance',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Anywhere Across the Island',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    bottom: -1,
+                    left: 0,
+                    right: 0,
+                    child: ClipPath(
+                      clipper: _CurveClipper(),
+                      child: Container(height: 28, color: Colors.white),
+                    ),
+                  ),
+                  SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 260),
+                        Container(
+                          color: Colors.white,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 8),
 
-                    // "What do you need help with?" section
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
+                              // "What do you need help with?" section
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
                           const Text(
                             'What do you need help with?',
                             textAlign: TextAlign.center,
@@ -204,12 +204,17 @@ class HomePage extends StatelessWidget {
                                   ),
                             ),
                           ),
-                          const SizedBox(height: 24),
-                        ],
-                      ),
+                                    const SizedBox(height: 24),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
 
