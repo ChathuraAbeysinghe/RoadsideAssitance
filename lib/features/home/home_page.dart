@@ -214,7 +214,7 @@ class HomePage extends StatelessWidget {
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(16),
                                       child: Image.asset(
-                                        'assets/images/hero.png',
+                                        'assets/images/autoshop.jpg',
                                         height: 130,
                                         width: double.infinity,
                                         fit: BoxFit.cover,
