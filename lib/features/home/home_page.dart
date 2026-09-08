@@ -61,53 +61,52 @@ class HomePage extends StatelessWidget {
                   SizedBox(
                     height: 210,
                     width: double.infinity,
-                    child: Image.asset(
-                      'assets/images/hero.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          Container(color: const Color(0xFFE30613)),
-                    ),
-                  ),
-                  Positioned(
-                    left: 20,
-                    bottom: 36,
-                    right: 20,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Stack(
                       children: [
-                        const Text(
-                          '24/7 Roadside Assistance',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Color.fromARGB(255, 255, 254, 254),
+                        Positioned.fill(
+                          child: Image.asset(
+                            'assets/images/hero.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(color: const Color(0xFFE30613)),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Anywhere Across the Island',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Colors.white.withValues(alpha: 0.9),
+                        Positioned(
+                          left: 20,
+                          bottom: 10,
+                          right: 20,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Text(
+                                '24/7 Roadside Assistance',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color.fromARGB(255, 255, 254, 254),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Anywhere Across the Island',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  Positioned(
-                    bottom: -1,
-                    left: 0,
-                    right: 0,
-                    child: ClipPath(
-                      clipper: _CurveClipper(),
-                      child: Container(height: 28, color: Colors.white),
                     ),
                   ),
                   SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 190),
+                        const SizedBox(height: 200),
                         Container(
                           decoration: const BoxDecoration(
                             color: Colors.white,
