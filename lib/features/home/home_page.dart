@@ -22,7 +22,7 @@ class HomePage extends StatelessWidget {
           children: [
             // Fixed greeting header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -30,7 +30,7 @@ class HomePage extends StatelessWidget {
                     child: Text(
                       'Hi $userName,\n$_greeting',
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         height: 1.3,
                       ),
@@ -80,7 +80,7 @@ class HomePage extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: Color.fromARGB(255, 255, 254, 254),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -136,7 +136,7 @@ class HomePage extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     const Text(
-                                      'What do you need help with?',
+                                      'Emergency Services',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 22,
@@ -151,7 +151,8 @@ class HomePage extends StatelessWidget {
                                         Expanded(
                                           child: _ServiceItem(
                                             label: 'Car Towing',
-                                            imagePath: 'assets/images/hero.png',
+                                            imagePath:
+                                                'assets/images/towing.jpg',
                                             height: 150,
                                           ),
                                         ),
@@ -159,7 +160,8 @@ class HomePage extends StatelessWidget {
                                         Expanded(
                                           child: _ServiceItem(
                                             label: 'Request Mechanic',
-                                            imagePath: 'assets/images/hero.png',
+                                            imagePath:
+                                                'assets/images/mechanic.png',
                                             height: 150,
                                           ),
                                         ),
@@ -173,7 +175,8 @@ class HomePage extends StatelessWidget {
                                         Expanded(
                                           child: _ServiceItem(
                                             label: 'Out of Gas',
-                                            imagePath: 'assets/images/hero.png',
+                                            imagePath:
+                                                'assets/images/outoffuel.jpg',
                                             height: 110,
                                           ),
                                         ),
@@ -181,7 +184,8 @@ class HomePage extends StatelessWidget {
                                         Expanded(
                                           child: _ServiceItem(
                                             label: 'Dead Battery',
-                                            imagePath: 'assets/images/hero.png',
+                                            imagePath:
+                                                'assets/images/jumpstart.jpg',
                                             height: 110,
                                           ),
                                         ),
@@ -189,7 +193,8 @@ class HomePage extends StatelessWidget {
                                         Expanded(
                                           child: _ServiceItem(
                                             label: 'Flat Tire',
-                                            imagePath: 'assets/images/hero.png',
+                                            imagePath:
+                                                'assets/images/flattire.png',
                                             height: 110,
                                           ),
                                         ),
