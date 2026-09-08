@@ -20,94 +20,97 @@ class HomePage extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
+            // Fixed greeting header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Hi $userName,\n$_greeting',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Icon(
+                      Icons.person_outline,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Fixed hero banner
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                SizedBox(
+                  height: 260,
+                  width: double.infinity,
+                  child: Image.asset(
+                    'assets/images/hero.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        Container(color: const Color(0xFFE30613)),
+                  ),
+                ),
+                Positioned(
+                  left: 20,
+                  bottom: 36,
+                  right: 20,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '24/7 Roadside Assistance',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Anywhere Across the Island',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // White curved overlay to blend into the section below
+                Positioned(
+                  bottom: -1,
+                  left: 0,
+                  right: 0,
+                  child: ClipPath(
+                    clipper: _CurveClipper(),
+                    child: Container(height: 28, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+
+            // Scrollable service content
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Greeting header
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Hi $userName,\n$_greeting',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey.shade300),
-                            ),
-                            child: Icon(Icons.person_outline, color: Colors.grey.shade600),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Hero banner
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        SizedBox(
-                          height: 260,
-                          width: double.infinity,
-                          child: Image.asset(
-                            'assets/images/hero.png',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              color: const Color(0xFFE30613),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: 20,
-                          bottom: 36,
-                          right: 20,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '24/7 Roadside Assistance',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Anywhere Across the Island',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // White curved overlay to blend into the section below
-                        Positioned(
-                          bottom: -1,
-                          left: 0,
-                          right: 0,
-                          child: ClipPath(
-                            clipper: _CurveClipper(),
-                            child: Container(height: 28, color: Colors.white),
-                          ),
-                        ),
-                      ],
-                    ),
-
                     const SizedBox(height: 8),
 
                     // "What do you need help with?" section
@@ -119,7 +122,10 @@ class HomePage extends StatelessWidget {
                           const Text(
                             'What do you need help with?',
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 20),
 
@@ -177,7 +183,10 @@ class HomePage extends StatelessWidget {
 
                           const Text(
                             'Explore Nearby',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 16),
 
@@ -188,10 +197,11 @@ class HomePage extends StatelessWidget {
                               height: 130,
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                height: 130,
-                                color: Colors.grey.shade300,
-                              ),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                    height: 130,
+                                    color: Colors.grey.shade300,
+                                  ),
                             ),
                           ),
                           const SizedBox(height: 24),
@@ -238,7 +248,10 @@ class _ServiceItem extends StatelessWidget {
               height: height,
               width: double.infinity,
               color: Colors.grey.shade300,
-              child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
+              child: const Icon(
+                Icons.image_not_supported_outlined,
+                color: Colors.grey,
+              ),
             ),
           ),
         ),
@@ -265,7 +278,11 @@ class _BottomNavBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: const [
-          _NavItem(label: 'Home', iconPath: 'assets/images/home1.png', isActive: true),
+          _NavItem(
+            label: 'Home',
+            iconPath: 'assets/images/home1.png',
+            isActive: true,
+          ),
           _NavItem(label: 'Requests', iconPath: 'assets/images/home1.png'),
           _NavItem(label: 'Vehicle', iconPath: 'assets/images/home1.png'),
           _NavItem(label: 'More', iconPath: 'assets/images/home1.png'),
@@ -303,7 +320,11 @@ class _NavItem extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ],
     );
