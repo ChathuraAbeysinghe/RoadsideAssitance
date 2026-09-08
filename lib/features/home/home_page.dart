@@ -169,7 +169,7 @@ class _HomePageState extends State<HomePage> {
                                   horizontal: 16,
                                 ),
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(30),
                                   border: Border.all(
                                     color: Colors.grey.shade300,
                                   ),
@@ -266,7 +266,7 @@ class _HomePageState extends State<HomePage> {
                                         child: _ServiceItem(
                                           label: 'Vehicle Tow',
                                           imagePath: 'assets/images/towing.png',
-                                          height: 130,
+                                          height: 110,
                                         ),
                                       ),
                                       const SizedBox(width: 14),
@@ -275,7 +275,7 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Request Mechanic',
                                           imagePath:
                                               'assets/images/mechanic.png',
-                                          height: 130,
+                                          height: 110,
                                         ),
                                       ),
                                     ],
@@ -290,7 +290,7 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Request Fuel',
                                           imagePath:
                                               'assets/images/outoffuel.png',
-                                          height: 80,
+                                          height: 60,
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -299,7 +299,7 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Flat Tire',
                                           imagePath:
                                               'assets/images/flattire.png',
-                                          height: 80,
+                                          height: 60,
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -308,7 +308,7 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Jump Start',
                                           imagePath:
                                               'assets/images/jumpstart.png',
-                                          height: 80,
+                                          height: 60,
                                         ),
                                       ),
                                     ],
@@ -418,7 +418,7 @@ class _BottomNavBar extends StatelessWidget {
         children: const [
           _NavItem(
             label: 'Home',
-            iconPath: 'assets/images/home1.png',
+            iconPath: 'assets/images/home2.png',
             isActive: true,
           ),
           _NavItem(label: 'Requests', iconPath: 'assets/images/clipboard1.png'),
@@ -443,7 +443,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive ? const Color(0xFFE30613) : Colors.grey.shade600;
+    final color = Colors.grey.shade600;
+    final imageColor = isActive ? null : color;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -451,7 +453,7 @@ class _NavItem extends StatelessWidget {
           iconPath,
           height: 24,
           width: 24,
-          color: color,
+          color: imageColor,
           errorBuilder: (context, error, stackTrace) =>
               Icon(Icons.circle_outlined, size: 24, color: color),
         ),
