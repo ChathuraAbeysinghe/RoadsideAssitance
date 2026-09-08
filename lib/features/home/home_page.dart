@@ -162,14 +162,14 @@ class _HomePageState extends State<HomePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                               child: Container(
                                 height: 52,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
                                 ),
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
                                     color: Colors.grey.shade300,
                                   ),
@@ -196,7 +196,7 @@ class _HomePageState extends State<HomePage> {
 
                             // Auto-rotating hero carousel (changes image every 5 seconds).
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                               child: Container(
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(16),
