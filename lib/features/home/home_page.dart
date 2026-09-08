@@ -132,115 +132,135 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: Stack(
                   children: [
-                    // Auto-rotating hero carousel (changes image every 5 seconds)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: SizedBox(
-                          height: 210,
-                          width: double.infinity,
-                          child: PageView.builder(
-                            controller: _heroController,
-                            itemCount: _heroImages.length,
-                            onPageChanged: (index) {
-                              _currentHeroPage = index;
-                            },
-                            itemBuilder: (context, index) {
-                              return Image.asset(
-                                _heroImages[index],
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(color: const Color(0xFFE30613)),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-
-                    // Emergency Services section
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 90),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Emergency Services',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
+                          // Auto-rotating hero carousel (changes image every 5 seconds)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: SizedBox(
+                                height: 210,
+                                width: double.infinity,
+                                child: PageView.builder(
+                                  controller: _heroController,
+                                  itemCount: _heroImages.length,
+                                  onPageChanged: (index) {
+                                    _currentHeroPage = index;
+                                  },
+                                  itemBuilder: (context, index) {
+                                    return Image.asset(
+                                      _heroImages[index],
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              Container(
+                                                color: const Color(0xFFE30613),
+                                              ),
+                                    );
+                                  },
+                                ),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 28),
 
-                          // Row 1: two bigger cards
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _ServiceItem(
-                                  label: 'Vehicle Tow',
-                                  imagePath: 'assets/images/towing.png',
-                                  height: 130,
+                          // Emergency Services section
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  'Emergency Services',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: _ServiceItem(
-                                  label: 'Request Mechanic',
-                                  imagePath: 'assets/images/mechanic.png',
-                                  height: 130,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
+                                const SizedBox(height: 20),
 
-                          // Row 2: three smaller cards
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _ServiceItem(
-                                  label: 'Request Fuel',
-                                  imagePath: 'assets/images/outoffuel.png',
-                                  height: 80,
+                                // Row 1: two bigger cards
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _ServiceItem(
+                                        label: 'Vehicle Tow',
+                                        imagePath: 'assets/images/towing.png',
+                                        height: 130,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: _ServiceItem(
+                                        label: 'Request Mechanic',
+                                        imagePath: 'assets/images/mechanic.png',
+                                        height: 130,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _ServiceItem(
-                                  label: 'Flat Tire',
-                                  imagePath: 'assets/images/flattire.png',
-                                  height: 80,
+                                const SizedBox(height: 20),
+
+                                // Row 2: three smaller cards
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _ServiceItem(
+                                        label: 'Request Fuel',
+                                        imagePath:
+                                            'assets/images/outoffuel.png',
+                                        height: 80,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: _ServiceItem(
+                                        label: 'Flat Tire',
+                                        imagePath: 'assets/images/flattire.png',
+                                        height: 80,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: _ServiceItem(
+                                        label: 'Jump Start',
+                                        imagePath:
+                                            'assets/images/jumpstart.png',
+                                        height: 80,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _ServiceItem(
-                                  label: 'Jump Start',
-                                  imagePath: 'assets/images/jumpstart.png',
-                                  height: 80,
-                                ),
-                              ),
-                            ],
+                                const SizedBox(height: 32),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 32),
                         ],
                       ),
+                    ),
+
+                    // Bottom navigation bar overlays the scrollable content.
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: SafeArea(top: false, child: _BottomNavBar()),
                     ),
                   ],
                 ),
               ),
             ),
-
-            // Bottom navigation bar (fixed, does not scroll)
-            SafeArea(top: false, child: _BottomNavBar()),
           ],
         ),
       ),
@@ -313,7 +333,15 @@ class _BottomNavBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
