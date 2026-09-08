@@ -65,83 +65,77 @@ class _HomePageState extends State<HomePage> {
         bottom: false,
         child: Column(
           children: [
-            // Everything below this point (including the search bar) scrolls together.
+            // Fixed header and search bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color.fromARGB(84, 165, 164, 164),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.person_outline,
+                      color: const Color.fromARGB(151, 117, 117, 117),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'Hi ${widget.userName}\n$_greeting',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.notifications_none,
+                    size: 26,
+                    color: Colors.black87,
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                height: 52,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.search, color: Colors.grey.shade500),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Search Here',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Greeting header
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color.fromARGB(84, 165, 164, 164),
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.person_outline,
-                              color: const Color.fromARGB(151, 117, 117, 117),
-                            ),
-                          ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              child: Text(
-                                'Hi ${widget.userName}\n$_greeting',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.3,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            Icons.notifications_none,
-                            size: 26,
-                            color: Colors.black87,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Search bar
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Container(
-                        height: 52,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.search, color: Colors.grey.shade500),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Search Here',
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
                     // Auto-rotating hero carousel (changes image every 5 seconds)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
