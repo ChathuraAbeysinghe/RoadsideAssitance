@@ -128,7 +128,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
+                        color: Colors.black.withValues(alpha: 0.12),
                         blurRadius: 10,
                         offset: const Offset(0, -3),
                       ),
@@ -136,20 +136,40 @@ class _HomePageState extends State<HomePage> {
                   ),
                   child: Stack(
                     children: [
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: 28,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.12),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                       SingleChildScrollView(
-                        padding: const EdgeInsets.only(bottom: 90),
+                        padding: const EdgeInsets.only(bottom: 120),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                               child: Container(
                                 height: 52,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
                                 ),
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(30),
                                   border: Border.all(
                                     color: Colors.grey.shade300,
                                   ),
@@ -175,9 +195,8 @@ class _HomePageState extends State<HomePage> {
                             const SizedBox(height: 20),
 
                             // Auto-rotating hero carousel (changes image every 5 seconds).
-                            // Auto-rotating hero carousel (changes image every 5 seconds).
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                               child: Container(
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(16),
@@ -247,7 +266,7 @@ class _HomePageState extends State<HomePage> {
                                         child: _ServiceItem(
                                           label: 'Vehicle Tow',
                                           imagePath: 'assets/images/towing.png',
-                                          height: 130,
+                                          height: 110,
                                         ),
                                       ),
                                       const SizedBox(width: 14),
@@ -256,7 +275,7 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Request Mechanic',
                                           imagePath:
                                               'assets/images/mechanic.png',
-                                          height: 130,
+                                          height: 110,
                                         ),
                                       ),
                                     ],
@@ -271,7 +290,7 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Request Fuel',
                                           imagePath:
                                               'assets/images/outoffuel.png',
-                                          height: 80,
+                                          height: 60,
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -280,7 +299,7 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Flat Tire',
                                           imagePath:
                                               'assets/images/flattire.png',
-                                          height: 80,
+                                          height: 60,
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -289,7 +308,7 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Jump Start',
                                           imagePath:
                                               'assets/images/jumpstart.png',
-                                          height: 80,
+                                          height: 60,
                                         ),
                                       ),
                                     ],
@@ -305,7 +324,7 @@ class _HomePageState extends State<HomePage> {
                       // Bottom navigation bar overlays the scrollable content.
                       Align(
                         alignment: Alignment.bottomCenter,
-                        child: SafeArea(top: false, child: _BottomNavBar()),
+                        child: _BottomNavBar(),
                       ),
                     ],
                   ),
@@ -380,8 +399,12 @@ class _ServiceItem extends StatelessWidget {
 class _BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      width: double.infinity,
+      height: 86 + bottomInset,
+      padding: EdgeInsets.only(top: 10, bottom: bottomInset),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -396,10 +419,11 @@ class _BottomNavBar extends StatelessWidget {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: const [
           _NavItem(
             label: 'Home',
-            iconPath: 'assets/images/home1.png',
+            iconPath: 'assets/images/home2.png',
             isActive: true,
           ),
           _NavItem(label: 'Requests', iconPath: 'assets/images/clipboard1.png'),
@@ -424,7 +448,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive ? const Color(0xFFE30613) : Colors.grey.shade600;
+    final color = Colors.grey.shade600;
+    final imageColor = isActive ? null : color;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -432,7 +458,7 @@ class _NavItem extends StatelessWidget {
           iconPath,
           height: 24,
           width: 24,
-          color: color,
+          color: imageColor,
           errorBuilder: (context, error, stackTrace) =>
               Icon(Icons.circle_outlined, size: 24, color: color),
         ),
