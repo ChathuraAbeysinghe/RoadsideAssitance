@@ -136,6 +136,26 @@ class _HomePageState extends State<HomePage> {
                   ),
                   child: Stack(
                     children: [
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: 28,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.12),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                       SingleChildScrollView(
                         padding: const EdgeInsets.only(bottom: 90),
                         child: Column(
@@ -174,7 +194,6 @@ class _HomePageState extends State<HomePage> {
                             ),
                             const SizedBox(height: 20),
 
-                            // Auto-rotating hero carousel (changes image every 5 seconds).
                             // Auto-rotating hero carousel (changes image every 5 seconds).
                             Padding(
                               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
