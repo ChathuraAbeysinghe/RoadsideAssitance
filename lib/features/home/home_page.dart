@@ -175,32 +175,47 @@ class _HomePageState extends State<HomePage> {
                             const SizedBox(height: 20),
 
                             // Auto-rotating hero carousel (changes image every 5 seconds).
+                            // Auto-rotating hero carousel (changes image every 5 seconds).
                             Padding(
                               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: SizedBox(
-                                  height: 210,
-                                  width: double.infinity,
-                                  child: PageView.builder(
-                                    controller: _heroController,
-                                    itemCount: _heroImages.length,
-                                    onPageChanged: (index) {
-                                      _currentHeroPage = index;
-                                    },
-                                    itemBuilder: (context, index) {
-                                      return Image.asset(
-                                        _heroImages[index],
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                Container(
-                                                  color: const Color(
-                                                    0xFFE30613,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.2,
+                                      ),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: SizedBox(
+                                    height: 210,
+                                    width: double.infinity,
+                                    child: PageView.builder(
+                                      controller: _heroController,
+                                      itemCount: _heroImages.length,
+                                      onPageChanged: (index) {
+                                        _currentHeroPage = index;
+                                      },
+                                      itemBuilder: (context, index) {
+                                        return Image.asset(
+                                          _heroImages[index],
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  Container(
+                                                    color: const Color(
+                                                      0xFFE30613,
+                                                    ),
                                                   ),
-                                                ),
-                                      );
-                                    },
+                                        );
+                                      },
+                                    ),
                                   ),
                                 ),
                               ),
