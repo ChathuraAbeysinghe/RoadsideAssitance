@@ -37,7 +37,10 @@ void _goToRoleHome(BuildContext context, AppUser user) {
 
   switch (user.role) {
     case UserRole.driver:
-      destination = HomePage(userName: user.name);
+      destination = HomePage(
+        userName: user.name,
+        profileImagePath: user.profileImagePath,
+      );
       break;
     case UserRole.mechanic:
       // TODO: replace with your real MechanicHomePage once it exists.
