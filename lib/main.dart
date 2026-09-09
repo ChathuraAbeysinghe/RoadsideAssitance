@@ -90,7 +90,10 @@ class _AuthenticatedRoute extends StatelessWidget {
   Widget _buildRoleHome(AppUser user) {
     switch (user.role) {
       case UserRole.driver:
-        return HomePage(userName: user.name);
+        return HomePage(
+          userName: user.name,
+          profileImagePath: user.profileImagePath,
+        );
       case UserRole.mechanic:
         return Scaffold(
           appBar: AppBar(title: const Text('Mechanic home')),
