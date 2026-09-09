@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../entities/app_user.dart';
+import '../../../cloudinary_service.dart';
 import '../../home/home_page.dart';
 
 class CompleteProfilePage extends StatefulWidget {
@@ -20,8 +24,21 @@ class CompleteProfilePage extends StatefulWidget {
 
 class _CompleteProfilePageState extends State<CompleteProfilePage> {
   final _nameController = TextEditingController();
-  UserRole? _selectedRole;
+  final _picker = ImagePicker();
+
+  XFile? _pickedImage;
   bool _isLoading = false;
+
+  Future<void> _pickImage() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+      maxWidth: 512,
+    );
+    if (picked != null) {
+      setState(() => _pickedImage = picked);
+    }
+  }
 
   Future<void> _onSubmit() async {
     if (_nameController.text.trim().isEmpty) {
@@ -30,22 +47,29 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
       ).showSnackBar(const SnackBar(content: Text('Please enter your name')));
       return;
     }
-    if (_selectedRole == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select whether you are a driver or mechanic'),
-        ),
-      );
-      return;
-    }
 
     setState(() => _isLoading = true);
+
+    String imageUrl = '';
+    if (_pickedImage != null) {
+      final uploadedUrl = await CloudinaryService.uploadImage(_pickedImage!);
+      if (uploadedUrl == null) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image upload failed. Try again.')),
+        );
+        return;
+      }
+      imageUrl = uploadedUrl;
+    }
 
     final user = AppUser(
       uid: widget.uid,
       phoneNumber: widget.phoneNumber,
       name: _nameController.text.trim(),
-      role: _selectedRole!,
+      role: UserRole.driver,
+      profileImagePath: imageUrl,
     );
 
     await FirebaseFirestore.instance
@@ -55,22 +79,13 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
     if (!mounted) return;
 
-    Widget destination;
-    switch (_selectedRole!) {
-      case UserRole.driver:
-        destination = HomePage(userName: user.name);
-        break;
-      case UserRole.mechanic:
-        // TODO: replace with your real MechanicHomePage once it exists.
-        destination = Scaffold(
-          appBar: AppBar(title: const Text('Mechanic home')),
-          body: Center(child: Text('Welcome, ${user.name}!')),
-        );
-        break;
-    }
-
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => destination),
+      MaterialPageRoute(
+        builder: (_) => HomePage(
+          userName: user.name,
+          profileImagePath: user.profileImagePath,
+        ),
+      ),
       (route) => false,
     );
   }
@@ -86,133 +101,123 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 24),
-              const Text(
-                'Complete Your Profile',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Just a couple more details before you get started',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 32),
-
-              // Name field
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Full Name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Role selector
-              const Text(
-                'I am a',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _roleCard(
-                      UserRole.driver,
-                      'Driver',
-                      Icons.directions_car,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _roleCard(
-                      UserRole.mechanic,
-                      'Mechanic',
-                      Icons.build,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 40),
-
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _onSubmit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE30613),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.5,
-                          ),
-                        )
-                      : const Text(
-                          'Get Started',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 40),
+                Center(
+                  child: GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.grey.shade300,
+                          width: 2,
                         ),
+                        color: Colors.grey.shade200,
+                      ),
+                      child: CircleAvatar(
+                        radius: 58,
+                        backgroundColor: Colors.transparent,
+                        backgroundImage: _pickedImage != null
+                            ? FileImage(File(_pickedImage!.path))
+                            : null,
+                        child: _pickedImage == null
+                            ? Icon(
+                                Icons.camera_alt_rounded,
+                                size: 38,
+                                color: Colors.grey.shade600,
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _roleCard(UserRole role, String label, IconData icon) {
-    final isSelected = _selectedRole == role;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedRole = role),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? const Color(0xFFE30613) : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-          color: isSelected
-              ? const Color(0xFFE30613).withValues(alpha: 0.05)
-              : Colors.white,
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 32,
-              color: isSelected
-                  ? const Color(0xFFE30613)
-                  : Colors.grey.shade600,
+                const SizedBox(height: 12),
+                const Center(
+                  child: Text(
+                    'Add profile photo',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                const Center(
+                  child: Text(
+                    'Complete Your Profile',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    'Just a couple more details before you get started',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                TextField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Full Name',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.black),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Colors.black,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _onSubmit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE30613),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : const Text(
+                            'Get Started',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: isSelected ? const Color(0xFFE30613) : Colors.black87,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

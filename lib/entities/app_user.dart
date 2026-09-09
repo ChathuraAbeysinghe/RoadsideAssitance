@@ -27,12 +27,14 @@ class AppUser {
   final String phoneNumber;
   final String name;
   final UserRole role;
+  final String profileImagePath;
 
   AppUser({
     required this.uid,
     required this.phoneNumber,
     required this.name,
     required this.role,
+    this.profileImagePath = '',
   });
 
   factory AppUser.fromMap(String uid, Map<String, dynamic> map) {
@@ -41,6 +43,7 @@ class AppUser {
       phoneNumber: map['phoneNumber'] as String? ?? '',
       name: map['name'] as String? ?? '',
       role: UserRoleX.fromString(map['role'] as String),
+      profileImagePath: map['profileImagePath'] as String? ?? '',
     );
   }
 
@@ -49,6 +52,7 @@ class AppUser {
       'phoneNumber': phoneNumber,
       'name': name,
       'role': role.name,
+      'profileImagePath': profileImagePath,
     };
   }
 }
