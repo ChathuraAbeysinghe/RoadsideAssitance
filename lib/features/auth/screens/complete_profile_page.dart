@@ -69,7 +69,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: 40),
                 Center(
                   child: Image.asset(
                     'assets/images/logo.png',
