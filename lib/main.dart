@@ -90,7 +90,10 @@ class _AuthenticatedRoute extends StatelessWidget {
   Widget _buildRoleHome(AppUser user) {
     switch (user.role) {
       case UserRole.driver:
-        return HomePage(userName: user.name);
+        return HomePage(
+          userName: user.name,
+          profileImagePath: user.profileImagePath,
+        );
       case UserRole.mechanic:
         return Scaffold(
           appBar: AppBar(title: const Text('Mechanic home')),
@@ -100,12 +103,81 @@ class _AuthenticatedRoute extends StatelessWidget {
   }
 }
 
-class _LoadingScreen extends StatelessWidget {
+class _LoadingScreen extends StatefulWidget {
   const _LoadingScreen();
 
   @override
+  State<_LoadingScreen> createState() => _LoadingScreenState();
+}
+
+class _LoadingScreenState extends State<_LoadingScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+
+    final scaleAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutBack,
+    );
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: FadeTransition(
+          opacity: fadeAnimation,
+          child: ScaleTransition(
+            scale: scaleAnimation,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/images/logo.png',
+                  width: 120,
+                  height: 120,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.local_shipping,
+                    size: 100,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Roadside Assistance',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

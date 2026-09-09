@@ -4,8 +4,13 @@ import 'package:flutter/material.dart';
 
 class HomePage extends StatefulWidget {
   final String userName;
+  final String profileImagePath;
 
-  const HomePage({super.key, this.userName = 'Kavidu Purnamal'});
+  const HomePage({
+    super.key,
+    this.userName = 'Kavidu Purnamal',
+    this.profileImagePath = '',
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -25,9 +30,9 @@ class _HomePageState extends State<HomePage> {
 
   String get _greeting {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return 'Good Morning!';
+    if (hour < 17) return 'Good Afternoon!';
+    return 'Good Evening!';
   }
 
   @override
@@ -67,8 +72,8 @@ class _HomePageState extends State<HomePage> {
             begin: Alignment.topLeft,
             end: Alignment.centerRight,
             colors: [
-              Color.fromARGB(255, 255, 158, 2),
-              Color.fromARGB(255, 255, 225, 1),
+              Color.fromARGB(255, 255, 195, 66),
+              Color.fromARGB(255, 255, 240, 153),
             ],
           ),
         ),
@@ -88,22 +93,41 @@ class _HomePageState extends State<HomePage> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color.fromARGB(255, 0, 0, 0),
+                          color: const Color.fromARGB(0, 212, 211, 211),
                         ),
                       ),
-                      child: Icon(
-                        Icons.person_outline,
-                        color: const Color.fromARGB(255, 0, 0, 0),
+                      child: ClipOval(
+                        child: widget.profileImagePath.isEmpty
+                            ? Image.asset(
+                                'assets/images/profile.png',
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                              )
+                            : Image.network(
+                                widget.profileImagePath,
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Image.asset(
+                                      'assets/images/profile.png',
+                                      width: 48,
+                                      height: 48,
+                                      fit: BoxFit.cover,
+                                    ),
+                              ),
                       ),
                     ),
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
-                          'Hi ${widget.userName}\n$_greeting',
+                          'Hi ${widget.userName},\n$_greeting',
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+
+                            fontWeight: FontWeight.w500,
                             height: 1.3,
                             color: Color.fromARGB(255, 0, 0, 0),
                           ),
@@ -407,7 +431,7 @@ class _BottomNavBar extends StatelessWidget {
       padding: EdgeInsets.only(top: 10, bottom: bottomInset),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         border: Border(top: BorderSide(color: Colors.grey.shade200)),
         boxShadow: [
           BoxShadow(
