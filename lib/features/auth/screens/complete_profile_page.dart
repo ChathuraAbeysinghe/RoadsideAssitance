@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../entities/app_user.dart';
+import '../../../cloudinary_service.dart';
 import '../../home/home_page.dart';
 
 class CompleteProfilePage extends StatefulWidget {
@@ -20,7 +24,21 @@ class CompleteProfilePage extends StatefulWidget {
 
 class _CompleteProfilePageState extends State<CompleteProfilePage> {
   final _nameController = TextEditingController();
+  final _picker = ImagePicker();
+
+  XFile? _pickedImage;
   bool _isLoading = false;
+
+  Future<void> _pickImage() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+      maxWidth: 512,
+    );
+    if (picked != null) {
+      setState(() => _pickedImage = picked);
+    }
+  }
 
   Future<void> _onSubmit() async {
     if (_nameController.text.trim().isEmpty) {
@@ -32,11 +50,26 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
 
     setState(() => _isLoading = true);
 
+    String imageUrl = '';
+    if (_pickedImage != null) {
+      final uploadedUrl = await CloudinaryService.uploadImage(_pickedImage!);
+      if (uploadedUrl == null) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image upload failed. Try again.')),
+        );
+        return;
+      }
+      imageUrl = uploadedUrl;
+    }
+
     final user = AppUser(
       uid: widget.uid,
       phoneNumber: widget.phoneNumber,
       name: _nameController.text.trim(),
       role: UserRole.driver,
+      profileImagePath: imageUrl,
     );
 
     await FirebaseFirestore.instance
@@ -71,17 +104,48 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
               children: [
                 const SizedBox(height: 40),
                 Center(
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    height: 100,
-                    errorBuilder: (context, error, stackTrace) => const Icon(
-                      Icons.local_shipping,
-                      size: 80,
+                  child: GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.grey.shade300,
+                          width: 2,
+                        ),
+                        color: Colors.grey.shade200,
+                      ),
+                      child: CircleAvatar(
+                        radius: 58,
+                        backgroundColor: Colors.transparent,
+                        backgroundImage: _pickedImage != null
+                            ? FileImage(File(_pickedImage!.path))
+                            : null,
+                        child: _pickedImage == null
+                            ? Icon(
+                                Icons.camera_alt_rounded,
+                                size: 38,
+                                color: Colors.grey.shade600,
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Center(
+                  child: Text(
+                    'Add profile photo',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                       color: Colors.black87,
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
                 const Center(
                   child: Text(
                     'Complete Your Profile',
@@ -97,7 +161,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
                 TextField(
                   controller: _nameController,
                   decoration: InputDecoration(
