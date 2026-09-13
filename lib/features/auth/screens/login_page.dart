@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 
+import '../../../entities/app_user.dart';
 import '../phone_auth_datasource.dart';
 import '../auth_router_helper.dart';
 import 'otp_verification.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  /// The role the user picked on the Welcome screen. Only used if this
+  /// turns out to be a brand-new account; existing accounts are routed
+  /// by their real, already-stored role in Firestore.
+  final UserType intendedRole;
+
+  const LoginPage({super.key, required this.intendedRole});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -38,6 +44,7 @@ class _LoginPageState extends State<LoginPage> {
             builder: (_) => OtpVerification(
               phoneNumber: _completePhoneNumber!,
               authDataSource: _authDataSource,
+              intendedRole: widget.intendedRole,
             ),
           ),
         );
@@ -45,7 +52,12 @@ class _LoginPageState extends State<LoginPage> {
       onAutoVerified: (userCredential) async {
         if (!mounted) return;
         final uid = userCredential.user!.uid;
-        await routeAfterAuth(context, uid, _completePhoneNumber!);
+        await routeAfterAuth(
+          context,
+          uid,
+          _completePhoneNumber!,
+          intendedRole: widget.intendedRole,
+        );
       },
       onFailed: (message) {
         if (!mounted) return;
@@ -77,17 +89,21 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 24),
               Center(
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  height: 100,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.local_shipping,
-                    size: 80,
-                    color: Colors.black87,
-                  ),
+                child: Column(
+                  children: [
+                    Image.asset(
+                      'assets/images/logo.png',
+                      height: 90,
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.local_shipping,
+                        size: 80,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 10),
               const Center(
                 child: Text(
                   'Please Enter Your Mobile Number',
@@ -95,12 +111,12 @@ class _LoginPageState extends State<LoginPage> {
                   style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Center(
                 child: Text(
                   'We will send you a verification code to this number',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ),
               const SizedBox(height: 24),
