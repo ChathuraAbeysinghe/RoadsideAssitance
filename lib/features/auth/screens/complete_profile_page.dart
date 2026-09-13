@@ -64,11 +64,13 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
       imageUrl = uploadedUrl;
     }
 
-    final user = AppUser(
+    // This page is driver-only signup, so we construct a Driver directly.
+    // userType, currentLocation, and rating all default sensibly
+    // (userType.driver is set internally; location/rating start empty).
+    final user = Driver(
       uid: widget.uid,
       phoneNumber: widget.phoneNumber,
       name: _nameController.text.trim(),
-      role: UserRole.driver,
       profileImagePath: imageUrl,
     );
 
