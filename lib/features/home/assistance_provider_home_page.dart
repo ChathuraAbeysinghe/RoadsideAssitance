@@ -1,13 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Home page shown to assistance providers (mechanic, tow truck, fuel
-/// delivery, flat tire, battery boost) after they complete their profile.
-///
-/// Layout: a yellow-gradient hero section holds everything the provider
-/// needs at a glance (profile, greeting, date/time, an online/offline
-/// toggle beside the notification bell, today's stats, and their active
-/// vehicle). Below it, a white sheet with a curved top edge and a soft
-/// shadow holds the scrollable recent-request history.
+import '../_share/navbar/app_bottom_nav_bar_assisstance_provider.dart';
+
 class AssistanceProviderHomePage extends StatefulWidget {
   final String userName;
   final String profileImagePath;
@@ -550,9 +544,12 @@ class _AssistanceProviderHomePageState
               ],
             ),
           ),
-          const Align(
+          Align(
             alignment: Alignment.bottomCenter,
-            child: _ProviderBottomNavBar(),
+            // Home is tab index 0. All four tabs, icons, and destinations
+            // (plus the signed-in user's uid) are handled inside the nav
+            // bar itself — nothing to wire up here.
+            child: const AppBottomNavBarAssisstanceProvider(activeIndex: 0),
           ),
         ],
       ),
@@ -881,78 +878,6 @@ class _HeroStatChip extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ProviderBottomNavBar extends StatelessWidget {
-  const _ProviderBottomNavBar();
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-
-    return Container(
-      width: double.infinity,
-      height: 78 + bottomInset,
-      padding: EdgeInsets.only(top: 10, bottom: bottomInset),
-      decoration: BoxDecoration(
-        color: _Palette.surface,
-        border: const Border(top: BorderSide(color: _Palette.border)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: const [
-          _NavItem(label: 'Home', icon: Icons.home_rounded, isActive: true),
-          _NavItem(label: 'Jobs', icon: Icons.assignment_outlined),
-          _NavItem(
-            label: 'Earnings',
-            icon: Icons.account_balance_wallet_outlined,
-          ),
-          _NavItem(label: 'More', icon: Icons.apps_rounded),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isActive;
-
-  const _NavItem({
-    required this.label,
-    required this.icon,
-    this.isActive = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isActive ? const Color(0xFFB45309) : _Palette.textTertiary;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 23, color: color),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11.5,
-            color: color,
-            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 }

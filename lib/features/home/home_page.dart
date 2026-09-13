@@ -1,6 +1,10 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import '../_share/navbar/app_bottom_nav_bar.dart';
+import '../vehicles/vehicle_list_page.dart';
 
 class HomePage extends StatefulWidget {
   final String userName;
@@ -59,6 +63,35 @@ class _HomePageState extends State<HomePage> {
     _heroTimer?.cancel();
     _heroController.dispose();
     super.dispose();
+  }
+
+  // Nav bar indices: 0 = Home, 1 = Requests, 2 = Vehicle, 3 = More.
+  void _onNavTap(int index) {
+    switch (index) {
+      case 0:
+        // Already on Home — nothing to do.
+        break;
+      case 2:
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid == null) return;
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => VehicleListPage(uid: uid)));
+        break;
+      case 1:
+      case 3:
+      default:
+        // TODO: replace with real Requests / More pages once they
+        // exist. Routed to HomePage as a placeholder for now.
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => HomePage(
+              userName: widget.userName,
+              profileImagePath: widget.profileImagePath,
+            ),
+          ),
+        );
+        break;
+    }
   }
 
   @override
@@ -339,7 +372,28 @@ class _HomePageState extends State<HomePage> {
                       // Bottom navigation bar overlays the scrollable content.
                       Align(
                         alignment: Alignment.bottomCenter,
-                        child: _BottomNavBar(),
+                        child: AppBottomNavBar(
+                          activeIndex: 0,
+                          items: const [
+                            NavBarItem(
+                              label: 'Home',
+                              iconAssetPath: 'assets/images/home2.png',
+                            ),
+                            NavBarItem(
+                              label: 'Requests',
+                              iconAssetPath: 'assets/images/clipboard1.png',
+                            ),
+                            NavBarItem(
+                              label: 'Vehicle',
+                              iconAssetPath: 'assets/images/wheel1.png',
+                            ),
+                            NavBarItem(
+                              label: 'More',
+                              iconAssetPath: 'assets/images/application1.png',
+                            ),
+                          ],
+                          onTap: _onNavTap,
+                        ),
                       ),
                     ],
                   ),
@@ -407,86 +461,6 @@ class _ServiceItem extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _BottomNavBar extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-
-    return Container(
-      width: double.infinity,
-      height: 86 + bottomInset,
-      padding: EdgeInsets.only(top: 10, bottom: bottomInset),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: const [
-          _NavItem(
-            label: 'Home',
-            iconPath: 'assets/images/home2.png',
-            isActive: true,
-          ),
-          _NavItem(label: 'Requests', iconPath: 'assets/images/clipboard1.png'),
-          _NavItem(label: 'Vehicle', iconPath: 'assets/images/wheel1.png'),
-          _NavItem(label: 'More', iconPath: 'assets/images/application1.png'),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final String label;
-  final String iconPath;
-  final bool isActive;
-
-  const _NavItem({
-    required this.label,
-    required this.iconPath,
-    this.isActive = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Colors.grey.shade600;
-    final imageColor = isActive ? null : color;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Image.asset(
-          iconPath,
-          height: 24,
-          width: 24,
-          color: imageColor,
-          errorBuilder: (context, error, stackTrace) =>
-              Icon(Icons.circle_outlined, size: 24, color: color),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: color,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 }
