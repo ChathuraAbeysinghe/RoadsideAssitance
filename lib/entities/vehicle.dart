@@ -33,13 +33,6 @@ extension VehicleTypeX on VehicleType {
 // Vehicle
 // ============================================================
 
-/// A vehicle owned by a user (driver or assistance provider). Stored as
-/// its own document in a top-level `vehicles` Firestore collection,
-/// linked back to its owner via [ownerUid] — not embedded inside
-/// AppUser — so a user can own any number of vehicles without bloating
-/// their user document. A user's currently selected vehicle is tracked
-/// separately via AppUser.activeVehicleId, which stores this vehicle's
-/// [id].
 class Vehicle {
   final String id;
   final String ownerUid;

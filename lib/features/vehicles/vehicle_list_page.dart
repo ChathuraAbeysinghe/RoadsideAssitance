@@ -1,16 +1,30 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../entities/vehicle.dart';
 import 'add_vehicle_page.dart';
+
+enum _VehicleAction { edit, setActive, remove }
+
+class _VehicleListData {
+  final List<Vehicle> vehicles;
+  final String? activeVehicleId;
+
+  const _VehicleListData({
+    required this.vehicles,
+    required this.activeVehicleId,
+  });
+}
 
 /// Shows the signed-in user's owned vehicles.
 ///
 /// - Empty state: illustration + message + full-width "Add New Vehicle"
 ///   button (see reference image 1).
 /// - Populated state: one rounded tile per vehicle with a small
-///   per-type illustration, name/plate text, an overflow menu, and an
-///   "Add Vehicle" row pinned at the bottom of the list (reference
-///   image 2).
+///   per-type illustration, name/plate text (active vehicle marked with
+///   a small yellow star next to the name), an overflow menu
+///   (Edit / Set as active / Remove), and an "Add Vehicle" row pinned
+///   at the bottom of the list (reference image 2).
 class VehicleListPage extends StatefulWidget {
   final String uid;
 
@@ -21,19 +35,38 @@ class VehicleListPage extends StatefulWidget {
 }
 
 class _VehicleListPageState extends State<VehicleListPage> {
-  late Future<List<Vehicle>> _vehiclesFuture;
+  late Future<_VehicleListData> _dataFuture;
 
   @override
   void initState() {
     super.initState();
-    _vehiclesFuture = fetchVehiclesForUser(widget.uid);
+    _dataFuture = _loadData();
+  }
+
+  /// Loads the user's vehicles and their current activeVehicleId together,
+  /// so the tile list can show which one is active without a second
+  /// round-trip.
+  Future<_VehicleListData> _loadData() async {
+    final results = await Future.wait([
+      fetchVehiclesForUser(widget.uid),
+      FirebaseFirestore.instance.collection('users').doc(widget.uid).get(),
+    ]);
+
+    final vehicles = results[0] as List<Vehicle>;
+    final userDoc = results[1] as DocumentSnapshot<Map<String, dynamic>>;
+    final activeVehicleId = userDoc.data()?['activeVehicleId'] as String?;
+
+    return _VehicleListData(
+      vehicles: vehicles,
+      activeVehicleId: activeVehicleId,
+    );
   }
 
   Future<void> _refresh() async {
     setState(() {
-      _vehiclesFuture = fetchVehiclesForUser(widget.uid);
+      _dataFuture = _loadData();
     });
-    await _vehiclesFuture;
+    await _dataFuture;
   }
 
   Future<void> _onAddVehicle() async {
@@ -45,10 +78,161 @@ class _VehicleListPageState extends State<VehicleListPage> {
     }
   }
 
-  void _onVehicleMenuTap(Vehicle vehicle) {
-    // TODO: show a menu with actions like "Set as active", "Edit",
-    // "Delete" for this vehicle.
+  // ----------------------------------------------------------------
+  // Overflow menu
+  // ----------------------------------------------------------------
+
+  Future<void> _onVehicleMenuTap(Vehicle vehicle, bool isActive) async {
+    final action = await showModalBottomSheet<_VehicleAction>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit'),
+              onTap: () => Navigator.pop(context, _VehicleAction.edit),
+            ),
+            ListTile(
+              leading: Icon(
+                isActive ? Icons.star_rounded : Icons.star_border_rounded,
+                color: Colors.amber,
+              ),
+              title: Text(isActive ? 'Active vehicle' : 'Set as active'),
+              enabled: !isActive,
+              onTap: isActive
+                  ? null
+                  : () => Navigator.pop(context, _VehicleAction.setActive),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Remove', style: TextStyle(color: Colors.red)),
+              onTap: () => Navigator.pop(context, _VehicleAction.remove),
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _VehicleAction.edit:
+        await _onEditVehicle(vehicle);
+        break;
+      case _VehicleAction.setActive:
+        await _onSetActiveVehicle(vehicle);
+        break;
+      case _VehicleAction.remove:
+        await _onRemoveVehicle(vehicle);
+        break;
+    }
   }
+
+  Future<void> _onEditVehicle(Vehicle vehicle) async {
+    // TODO: this assumes AddVehiclePage has a `vehicleToEdit` param that
+    // pre-fills the form and saves back to the same doc ID instead of
+    // creating a new vehicle. Adjust if AddVehiclePage's actual
+    // signature differs.
+    final result = await Navigator.of(context).push<Vehicle>(
+      MaterialPageRoute(
+        builder: (_) =>
+            AddVehiclePage(ownerUid: widget.uid, vehicleToEdit: vehicle),
+      ),
+    );
+    if (result != null) {
+      await _refresh();
+    }
+  }
+
+  Future<void> _onSetActiveVehicle(Vehicle vehicle) async {
+    try {
+      // Active vehicle is tracked on the user doc (AppUser.activeVehicleId),
+      // not on the vehicle itself — so "set as active" just writes this
+      // vehicle's id there.
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.uid)
+          .update({'activeVehicleId': vehicle.id});
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${vehicle.displayLabel} set as active vehicle'),
+        ),
+      );
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not set active vehicle. Try again.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onRemoveVehicle(Vehicle vehicle) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove vehicle?'),
+        content: Text(
+          'This will remove ${vehicle.displayLabel} from your vehicles.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('vehicles')
+          .doc(vehicle.id)
+          .delete();
+
+      // If the deleted vehicle was the active one, clear the reference on
+      // the user doc so activeVehicleId doesn't point at a dead vehicle.
+      final userRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.uid);
+      final userDoc = await userRef.get();
+      if (userDoc.data()?['activeVehicleId'] == vehicle.id) {
+        await userRef.update({'activeVehicleId': null});
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${vehicle.displayLabel} removed')),
+      );
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not remove vehicle. Try again.')),
+      );
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Build
+  // ----------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -59,8 +243,8 @@ class _VehicleListPageState extends State<VehicleListPage> {
           children: [
             _buildHeader(),
             Expanded(
-              child: FutureBuilder<List<Vehicle>>(
-                future: _vehiclesFuture,
+              child: FutureBuilder<_VehicleListData>(
+                future: _dataFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -70,12 +254,13 @@ class _VehicleListPageState extends State<VehicleListPage> {
                     return _buildErrorState();
                   }
 
-                  final vehicles = snapshot.data ?? [];
+                  final data = snapshot.data;
+                  final vehicles = data?.vehicles ?? [];
                   if (vehicles.isEmpty) {
                     return _buildEmptyState();
                   }
 
-                  return _buildVehicleList(vehicles);
+                  return _buildVehicleList(vehicles, data?.activeVehicleId);
                 },
               ),
             ),
@@ -126,7 +311,7 @@ class _VehicleListPageState extends State<VehicleListPage> {
               color: Colors.grey.shade400,
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 0),
           const Text(
             'Your vehicle will appear here',
             textAlign: TextAlign.center,
@@ -190,17 +375,22 @@ class _VehicleListPageState extends State<VehicleListPage> {
     );
   }
 
-  Widget _buildVehicleList(List<Vehicle> vehicles) {
+  Widget _buildVehicleList(List<Vehicle> vehicles, String? activeVehicleId) {
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        children: [...vehicles.map(_buildVehicleTile), _buildAddVehicleTile()],
+        children: [
+          ...vehicles.map(
+            (v) => _buildVehicleTile(v, isActive: v.id == activeVehicleId),
+          ),
+          _buildAddVehicleTile(),
+        ],
       ),
     );
   }
 
-  Widget _buildVehicleTile(Vehicle vehicle) {
+  Widget _buildVehicleTile(Vehicle vehicle, {required bool isActive}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -228,14 +418,28 @@ class _VehicleListPageState extends State<VehicleListPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${vehicle.make} ${vehicle.model}'.trim(),
-                  style: const TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${vehicle.make} ${vehicle.model}'.trim(),
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isActive) ...[
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 18,
+                        color: Colors.amber,
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -246,7 +450,7 @@ class _VehicleListPageState extends State<VehicleListPage> {
             ),
           ),
           IconButton(
-            onPressed: () => _onVehicleMenuTap(vehicle),
+            onPressed: () => _onVehicleMenuTap(vehicle, isActive),
             icon: const Icon(Icons.more_vert_rounded),
             color: Colors.black87,
           ),
@@ -279,15 +483,15 @@ class _VehicleListPageState extends State<VehicleListPage> {
     );
   }
 
-  // Per-type illustration assets. Replace with real artwork matching
-  // the style in the reference (small isometric vehicle icons) —
-  // currently falls back to a plain Material icon if the asset is
-  // missing.
+  // Per-type illustration assets. All types point at the same
+  // placeholder icon for now — swap each case to its own asset once the
+  // real artwork exists (the switch is kept so that's a one-line change
+  // per type later, instead of hunting down a single constant).
   String _iconAssetFor(VehicleType type) => switch (type) {
     VehicleType.car => 'assets/images/vehicle-car.png',
     VehicleType.van => 'assets/images/vehicle-van.png',
     VehicleType.motorbike => 'assets/images/vehicle-motorbike.png',
-    VehicleType.threeWheeler => 'assets/images/vehicle-threewheeler.png',
+    VehicleType.threeWheeler => 'assets/images/vehicle-threeWheeler.png',
     VehicleType.truck => 'assets/images/vehicle-truck.png',
     VehicleType.bus => 'assets/images/vehicle-bus.png',
   };

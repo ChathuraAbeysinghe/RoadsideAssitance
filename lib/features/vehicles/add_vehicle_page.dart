@@ -3,21 +3,29 @@ import 'package:flutter/material.dart';
 
 import '../../entities/vehicle.dart';
 
-/// Form for adding a new vehicle, matching the "Add Vehicle" reference
-/// design: vehicle type chips, make/model fields, plate code/number
-/// fields, and a Confirm button that writes a new Vehicle document to
-/// Firestore.
+/// Form for adding a new vehicle, or editing an existing one when
+/// [vehicleToEdit] is passed. Matches the "Add Vehicle" reference design:
+/// vehicle type chips, make/model fields, plate code/number fields, and a
+/// Confirm button that writes the Vehicle document to Firestore.
 class AddVehiclePage extends StatefulWidget {
   final String ownerUid;
 
-  const AddVehiclePage({super.key, required this.ownerUid});
+  /// When non-null, the page opens in edit mode: fields are pre-filled
+  /// from this vehicle, the header/button read "Edit Vehicle" / "Save",
+  /// and Confirm updates this vehicle's existing doc instead of creating
+  /// a new one.
+  final Vehicle? vehicleToEdit;
+
+  const AddVehiclePage({super.key, required this.ownerUid, this.vehicleToEdit});
+
+  bool get _isEditing => vehicleToEdit != null;
 
   @override
   State<AddVehiclePage> createState() => _AddVehiclePageState();
 }
 
 class _AddVehiclePageState extends State<AddVehiclePage> {
-  VehicleType _selectedType = VehicleType.car;
+  late VehicleType _selectedType;
 
   final _makeController = TextEditingController();
   final _modelController = TextEditingController();
@@ -36,13 +44,39 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
   ];
 
   String _labelFor(VehicleType type) => switch (type) {
-        VehicleType.car => 'Car',
-        VehicleType.motorbike => 'Motorcycle',
-        VehicleType.bus => 'Bus',
-        VehicleType.truck => 'Truck',
-        VehicleType.van => 'Van',
-        VehicleType.threeWheeler => 'Three Wheeler',
-      };
+    VehicleType.car => 'Car',
+    VehicleType.motorbike => 'Motorcycle',
+    VehicleType.bus => 'Bus',
+    VehicleType.truck => 'Truck',
+    VehicleType.van => 'Van',
+    VehicleType.threeWheeler => 'Three Wheeler',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+
+    final existing = widget.vehicleToEdit;
+    _selectedType = existing?.vehicleType ?? VehicleType.car;
+
+    if (existing != null) {
+      _makeController.text = existing.make;
+      _modelController.text = existing.model;
+
+      // Plate is stored as a single "$plateCode - $plateNumber" string
+      // (see _onConfirm), so split it back apart for the two fields.
+      // Falls back to putting the whole thing in plateNumber if it
+      // doesn't match the expected "CODE - NUMBER" shape (e.g. legacy
+      // data saved a different way).
+      final parts = existing.plateNumber.split(' - ');
+      if (parts.length == 2) {
+        _plateCodeController.text = parts[0];
+        _plateNumberController.text = parts[1];
+      } else {
+        _plateNumberController.text = existing.plateNumber;
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -59,7 +93,10 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
     final plateCode = _plateCodeController.text.trim();
     final plateNumber = _plateNumberController.text.trim();
 
-    if (make.isEmpty || model.isEmpty || plateCode.isEmpty || plateNumber.isEmpty) {
+    if (make.isEmpty ||
+        model.isEmpty ||
+        plateCode.isEmpty ||
+        plateNumber.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all required fields')),
       );
@@ -70,7 +107,11 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
 
     try {
       final vehiclesRef = FirebaseFirestore.instance.collection('vehicles');
-      final docRef = vehiclesRef.doc();
+      final existing = widget.vehicleToEdit;
+
+      final docRef = existing != null
+          ? vehiclesRef.doc(existing.id)
+          : vehiclesRef.doc();
 
       final vehicle = Vehicle(
         id: docRef.id,
@@ -79,20 +120,30 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
         make: make,
         model: model,
         plateNumber: '$plateCode - $plateNumber',
+        // Preserve fields the form doesn't touch when editing (color,
+        // photoPath) rather than wiping them back to defaults.
+        color: existing?.color ?? '',
+        photoPath: existing?.photoPath ?? '',
       );
 
-      await docRef.set(vehicle.toMap());
+      if (existing != null) {
+        await docRef.update(vehicle.toMap());
+      } else {
+        await docRef.set(vehicle.toMap());
 
-      // If this is the user's first vehicle, set it as their active one.
-      final existing = await vehiclesRef
-          .where('ownerUid', isEqualTo: widget.ownerUid)
-          .limit(2)
-          .get();
-      if (existing.docs.length <= 1) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.ownerUid)
-            .update({'activeVehicleId': docRef.id});
+        // If this is the user's first vehicle, set it as their active
+        // one. Only relevant when creating — an edit never changes
+        // which vehicle is active.
+        final ownedVehicles = await vehiclesRef
+            .where('ownerUid', isEqualTo: widget.ownerUid)
+            .limit(2)
+            .get();
+        if (ownedVehicles.docs.length <= 1) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(widget.ownerUid)
+              .update({'activeVehicleId': docRef.id});
+        }
       }
 
       if (!mounted) return;
@@ -100,7 +151,13 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to save vehicle. Try again.')),
+        SnackBar(
+          content: Text(
+            widget._isEditing
+                ? 'Failed to save changes. Try again.'
+                : 'Failed to save vehicle. Try again.',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -193,9 +250,9 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
                                   strokeWidth: 2.5,
                                 ),
                               )
-                            : const Text(
-                                'Confirm',
-                                style: TextStyle(
+                            : Text(
+                                widget._isEditing ? 'Save' : 'Confirm',
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -219,9 +276,9 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          const Text(
-            'Add Vehicle',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          Text(
+            widget._isEditing ? 'Edit Vehicle' : 'Add Vehicle',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           Align(
             alignment: Alignment.centerLeft,
@@ -259,10 +316,7 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
                 fontWeight: FontWeight.w600,
                 color: isSelected ? Colors.white : Colors.black87,
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
                 side: BorderSide(
