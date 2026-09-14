@@ -39,6 +39,7 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
     VehicleType.motorbike,
     VehicleType.bus,
     VehicleType.truck,
+    VehicleType.towtruck,
     VehicleType.van,
     VehicleType.threeWheeler,
   ];
@@ -48,6 +49,7 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
     VehicleType.motorbike => 'Motorcycle',
     VehicleType.bus => 'Bus',
     VehicleType.truck => 'Truck',
+    VehicleType.towtruck => 'Tow Truck',
     VehicleType.van => 'Van',
     VehicleType.threeWheeler => 'Three Wheeler',
   };

@@ -490,10 +490,11 @@ class _VehicleListPageState extends State<VehicleListPage> {
   String _iconAssetFor(VehicleType type) => switch (type) {
     VehicleType.car => 'assets/images/vehicle-car.png',
     VehicleType.van => 'assets/images/vehicle-van.png',
-    VehicleType.motorbike => 'assets/images/vehicle-motorbike.png',
-    VehicleType.threeWheeler => 'assets/images/vehicle-threeWheeler.png',
+    VehicleType.motorbike => 'assets/images/vehicle-bike.png',
+    VehicleType.threeWheeler => 'assets/images/vehicle-threewheel.png',
     VehicleType.truck => 'assets/images/vehicle-truck.png',
     VehicleType.bus => 'assets/images/vehicle-bus.png',
+    VehicleType.towtruck => 'assets/images/vehicle-towtruck.png',
   };
 
   IconData _fallbackIconFor(VehicleType type) => switch (type) {
@@ -503,5 +504,6 @@ class _VehicleListPageState extends State<VehicleListPage> {
     VehicleType.threeWheeler => Icons.electric_rickshaw_rounded,
     VehicleType.truck => Icons.local_shipping_rounded,
     VehicleType.bus => Icons.directions_bus_rounded,
+    VehicleType.towtruck => Icons.local_shipping_rounded,
   };
 }

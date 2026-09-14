@@ -6,7 +6,7 @@ import 'app_user.dart';
 // VehicleType
 // ============================================================
 
-enum VehicleType { car, van, motorbike, threeWheeler, truck, bus }
+enum VehicleType { car, van, motorbike, threeWheeler, truck, bus, towtruck }
 
 extension VehicleTypeX on VehicleType {
   String get name => switch (this) {
@@ -16,6 +16,7 @@ extension VehicleTypeX on VehicleType {
     VehicleType.threeWheeler => 'threeWheeler',
     VehicleType.truck => 'truck',
     VehicleType.bus => 'bus',
+    VehicleType.towtruck => 'towtruck',
   };
 
   static VehicleType fromString(String value) => switch (value) {
@@ -25,6 +26,7 @@ extension VehicleTypeX on VehicleType {
     'threeWheeler' => VehicleType.threeWheeler,
     'truck' => VehicleType.truck,
     'bus' => VehicleType.bus,
+    'towtruck' => VehicleType.towtruck,
     _ => throw ArgumentError('Unknown vehicle type: $value'),
   };
 }
