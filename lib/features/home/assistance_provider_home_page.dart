@@ -552,10 +552,7 @@ class _AssistanceProviderHomePageState
             // Home is tab index 0. All four tabs, icons, and destinations
             // (plus the signed-in user's uid) are handled inside the nav
             // bar itself — nothing to wire up here.
-            child: AppBottomNavBar(
-              userType: widget.userType,
-              activeIndex: 0,
-            ),
+            child: AppBottomNavBar(userType: widget.userType, activeIndex: 0),
           ),
         ],
       ),
