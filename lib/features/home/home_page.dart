@@ -1,10 +1,8 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../_share/navbar/app_bottom_nav_bar.dart';
-import '../vehicles/vehicle_list_page.dart';
 
 class HomePage extends StatefulWidget {
   final String userName;
@@ -63,35 +61,6 @@ class _HomePageState extends State<HomePage> {
     _heroTimer?.cancel();
     _heroController.dispose();
     super.dispose();
-  }
-
-  // Nav bar indices: 0 = Home, 1 = Requests, 2 = Vehicle, 3 = More.
-  void _onNavTap(int index) {
-    switch (index) {
-      case 0:
-        // Already on Home — nothing to do.
-        break;
-      case 2:
-        final uid = FirebaseAuth.instance.currentUser?.uid;
-        if (uid == null) return;
-        Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => VehicleListPage(uid: uid)));
-        break;
-      case 1:
-      case 3:
-      default:
-        // TODO: replace with real Requests / More pages once they
-        // exist. Routed to HomePage as a placeholder for now.
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => HomePage(
-              userName: widget.userName,
-              profileImagePath: widget.profileImagePath,
-            ),
-          ),
-        );
-        break;
-    }
   }
 
   @override
@@ -370,30 +339,13 @@ class _HomePageState extends State<HomePage> {
                       ),
 
                       // Bottom navigation bar overlays the scrollable content.
+                      // Home is tab index 0. All four tabs, icons, and
+                      // destinations (plus the signed-in user's uid) are
+                      // handled inside the nav bar itself — nothing to wire
+                      // up here.
                       Align(
                         alignment: Alignment.bottomCenter,
-                        child: AppBottomNavBar(
-                          activeIndex: 0,
-                          items: const [
-                            NavBarItem(
-                              label: 'Home',
-                              iconAssetPath: 'assets/images/home2.png',
-                            ),
-                            NavBarItem(
-                              label: 'Requests',
-                              iconAssetPath: 'assets/images/clipboard1.png',
-                            ),
-                            NavBarItem(
-                              label: 'Vehicle',
-                              iconAssetPath: 'assets/images/wheel1.png',
-                            ),
-                            NavBarItem(
-                              label: 'More',
-                              iconAssetPath: 'assets/images/application1.png',
-                            ),
-                          ],
-                          onTap: _onNavTap,
-                        ),
+                        child: const AppBottomNavBarDriver(activeIndex: 0),
                       ),
                     ],
                   ),

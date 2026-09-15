@@ -1,54 +1,98 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// One item in the shared [AppBottomNavBar].
-///
-/// Supports either an image asset icon (with an optional [activeColor]
-/// override — pass null to show the image's own colors when active, as
-/// the driver home page's icons currently do) or a Material [IconData]
-/// icon, so both the driver and provider nav bars can share one widget.
-class NavBarItem {
-  final String label;
-  final String? iconAssetPath;
-  final IconData? iconData;
+import '../../home/home_page.dart';
+import '../../vehicles/vehicle_list_page.dart';
 
-  const NavBarItem({
+/// One tab in [AppBottomNavBarDriver]. Fully internal now — hosting pages
+/// never construct these; see [AppBottomNavBarDriver._tabs].
+class _NavTab {
+  final String label;
+  final String iconAssetPath;
+  final WidgetBuilder destinationBuilder;
+
+  const _NavTab({
     required this.label,
-    this.iconAssetPath,
-    this.iconData,
-  }) : assert(
-          iconAssetPath != null || iconData != null,
-          'Provide either iconAssetPath or iconData',
-        );
+    required this.iconAssetPath,
+    required this.destinationBuilder,
+  });
 }
 
-/// Shared bottom navigation bar shell used across driver and provider
-/// pages. Pass the four [items] for the current role and which [activeIndex]
-/// is selected; [onTap] fires with the tapped index.
+/// Bottom navigation bar shell for driver pages (home, requests, vehicle,
+/// more). Owns its own routing: the four tabs and where each one navigates
+/// are defined once, right here — no page that shows this nav bar needs to
+/// build an item list, wire up an `onTap` switch statement, or pass down a
+/// uid.
 ///
-/// Usage:
+/// The signed-in user's uid (needed by tabs like `VehicleListPage`) is read
+/// directly from `FirebaseAuth.instance.currentUser` — see [_uid].
+///
+/// Usage — every page just says which tab it corresponds to:
 /// ```dart
-/// AppBottomNavBar(
-///   activeIndex: 0,
-///   items: const [
-///     NavBarItem(label: 'Home', iconAssetPath: 'assets/images/home2.png'),
-///     NavBarItem(label: 'Requests', iconAssetPath: 'assets/images/clipboard1.png'),
-///     NavBarItem(label: 'Vehicle', iconAssetPath: 'assets/images/wheel1.png'),
-///     NavBarItem(label: 'More', iconAssetPath: 'assets/images/application1.png'),
-///   ],
-///   onTap: (index) { /* navigate */ },
-/// )
+/// // On HomePage's build():
+/// const AppBottomNavBarDriver(activeIndex: 0),
+///
+/// // On VehicleListPage's build():
+/// const AppBottomNavBarDriver(activeIndex: 2),
 /// ```
-class AppBottomNavBar extends StatelessWidget {
-  final List<NavBarItem> items;
+///
+/// Tapping the already-active tab does nothing (no duplicate page push).
+/// Tapping any other tab pushes that tab's page on top of the current one
+/// via `Navigator.push`, so the back button returns to where you were.
+///
+/// To change where a tab goes, edit [_tabs] below — nowhere else.
+class AppBottomNavBarDriver extends StatelessWidget {
   final int activeIndex;
-  final ValueChanged<int>? onTap;
 
-  const AppBottomNavBar({
-    super.key,
-    required this.items,
-    required this.activeIndex,
-    this.onTap,
-  });
+  const AppBottomNavBarDriver({super.key, required this.activeIndex});
+
+  // Currently signed-in user's uid, read directly from FirebaseAuth so no
+  // hosting page needs to thread it through. Empty if no one is signed in
+  // (shouldn't normally happen on an authenticated screen, but _handleTap
+  // guards against it below rather than crashing on a null uid).
+  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  // Single source of truth for every tab: label, icon, and destination.
+  // TEMP: Requests and More both point at HomePage until their real pages
+  // exist — swap those two builders when ready.
+  List<_NavTab> get _tabs => [
+    _NavTab(
+      label: 'Home',
+      iconAssetPath: 'assets/images/home2.png',
+      destinationBuilder: (_) => const HomePage(),
+    ),
+    _NavTab(
+      label: 'Requests',
+      iconAssetPath: 'assets/images/clipboard1.png',
+      destinationBuilder: (_) => const HomePage(), // TEMP
+    ),
+    _NavTab(
+      label: 'Vehicle',
+      iconAssetPath: 'assets/images/wheel1.png',
+      destinationBuilder: (_) => VehicleListPage(uid: _uid),
+    ),
+    _NavTab(
+      label: 'More',
+      iconAssetPath: 'assets/images/application1.png',
+      destinationBuilder: (_) => const HomePage(), // TEMP
+    ),
+  ];
+
+  void _handleTap(BuildContext context, int index) {
+    if (index == activeIndex) return; // already on this tab — no-op
+
+    if (_uid.isEmpty) {
+      // TODO: decide how you want to handle a missing session here —
+      // e.g. route to a sign-in page instead of showing this message.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in again to continue.')),
+      );
+      return;
+    }
+
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: _tabs[index].destinationBuilder));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,11 +117,11 @@ class AppBottomNavBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: List.generate(items.length, (index) {
+        children: List.generate(_tabs.length, (index) {
           return _NavItem(
-            item: items[index],
+            tab: _tabs[index],
             isActive: index == activeIndex,
-            onTap: onTap == null ? null : () => onTap!(index),
+            onTap: () => _handleTap(context, index),
           );
         }),
       ),
@@ -86,11 +130,11 @@ class AppBottomNavBar extends StatelessWidget {
 }
 
 class _NavItem extends StatelessWidget {
-  final NavBarItem item;
+  final _NavTab tab;
   final bool isActive;
   final VoidCallback? onTap;
 
-  const _NavItem({required this.item, required this.isActive, this.onTap});
+  const _NavItem({required this.tab, required this.isActive, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -102,23 +146,20 @@ class _NavItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (item.iconAssetPath != null)
-            Image.asset(
-              item.iconAssetPath!,
-              height: 24,
-              width: 24,
-              // Matches the driver HomePage's original behavior: the
-              // active tab shows the asset's own colors (no tint),
-              // inactive tabs are tinted grey.
-              color: isActive ? null : Colors.grey.shade600,
-              errorBuilder: (context, error, stackTrace) =>
-                  Icon(Icons.circle_outlined, size: 24, color: color),
-            )
-          else
-            Icon(item.iconData, size: 24, color: color),
+          Image.asset(
+            tab.iconAssetPath,
+            height: 24,
+            width: 24,
+            // Matches the driver HomePage's original behavior: the
+            // active tab shows the asset's own colors (no tint),
+            // inactive tabs are tinted grey.
+            color: isActive ? null : Colors.grey.shade600,
+            errorBuilder: (context, error, stackTrace) =>
+                Icon(Icons.circle_outlined, size: 24, color: color),
+          ),
           const SizedBox(height: 4),
           Text(
-            item.label,
+            tab.label,
             style: TextStyle(
               fontSize: 12,
               color: color,
