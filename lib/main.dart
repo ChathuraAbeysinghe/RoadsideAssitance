@@ -95,11 +95,13 @@ class _AuthenticatedRoute extends StatelessWidget {
     switch (user.userType) {
       case UserType.driver:
         return HomePage(
+          userType: user.userType,
           userName: user.name,
           profileImagePath: user.profileImagePath,
         );
       case UserType.assistanceProvider:
         return AssistanceProviderHomePage(
+          userType: user.userType,
           userName: user.name,
           profileImagePath: user.profileImagePath,
         );
