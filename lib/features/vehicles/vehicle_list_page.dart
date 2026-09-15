@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../entities/vehicle.dart';
+import '../_share/navbar/app_bottom_nav_bar_assisstance_provider.dart';
 import 'add_vehicle_page.dart';
 
 enum _VehicleAction { edit, setActive, remove }
@@ -266,6 +267,9 @@ class _VehicleListPageState extends State<VehicleListPage> {
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: const AppBottomNavBarAssisstanceProvider(
+        activeIndex: 2,
       ),
     );
   }
