@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../entities/app_user.dart';
 import '../../home/home_page.dart';
+import '../../home/assistance_provider_home_page.dart';
 import '../../vehicles/vehicle_list_page.dart';
 
-/// One tab in [AppBottomNavBarDriver]. Fully internal now — hosting pages
-/// never construct these; see [AppBottomNavBarDriver._tabs].
+/// One tab in [AppBottomNavBar]. Fully internal now — hosting pages never
+/// construct these; see [AppBottomNavBar._tabs].
 class _NavTab {
   final String label;
   final String iconAssetPath;
@@ -18,22 +20,19 @@ class _NavTab {
   });
 }
 
-/// Bottom navigation bar shell for driver pages (home, requests, vehicle,
-/// more). Owns its own routing: the four tabs and where each one navigates
-/// are defined once, right here — no page that shows this nav bar needs to
-/// build an item list, wire up an `onTap` switch statement, or pass down a
-/// uid.
+/// Shared bottom navigation bar shell for driver and assistance-provider
+/// pages. Its tab destinations are selected from the user's Firestore role.
 ///
 /// The signed-in user's uid (needed by tabs like `VehicleListPage`) is read
 /// directly from `FirebaseAuth.instance.currentUser` — see [_uid].
 ///
 /// Usage — every page just says which tab it corresponds to:
 /// ```dart
-/// // On HomePage's build():
-/// const AppBottomNavBarDriver(activeIndex: 0),
+/// // On a driver's HomePage:
+/// AppBottomNavBar(userType: UserType.driver, activeIndex: 0),
 ///
 /// // On VehicleListPage's build():
-/// const AppBottomNavBarDriver(activeIndex: 2),
+/// AppBottomNavBar(userType: userType, activeIndex: 2),
 /// ```
 ///
 /// Tapping the already-active tab does nothing (no duplicate page push).
@@ -41,10 +40,15 @@ class _NavTab {
 /// via `Navigator.push`, so the back button returns to where you were.
 ///
 /// To change where a tab goes, edit [_tabs] below — nowhere else.
-class AppBottomNavBarDriver extends StatelessWidget {
+class AppBottomNavBar extends StatelessWidget {
   final int activeIndex;
+  final UserType userType;
 
-  const AppBottomNavBarDriver({super.key, required this.activeIndex});
+  const AppBottomNavBar({
+    super.key,
+    required this.activeIndex,
+    required this.userType,
+  });
 
   // Currently signed-in user's uid, read directly from FirebaseAuth so no
   // hosting page needs to thread it through. Empty if no one is signed in
@@ -53,18 +57,24 @@ class AppBottomNavBarDriver extends StatelessWidget {
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   // Single source of truth for every tab: label, icon, and destination.
-  // TEMP: Requests and More both point at HomePage until their real pages
-  // exist — swap those two builders when ready.
   List<_NavTab> get _tabs => [
     _NavTab(
       label: 'Home',
       iconAssetPath: 'assets/images/home2.png',
-      destinationBuilder: (_) => const HomePage(),
+      destinationBuilder: (_) => userType == UserType.driver
+          ? const HomePage(userType: UserType.driver)
+          : const AssistanceProviderHomePage(
+              userType: UserType.assistanceProvider,
+            ),
     ),
     _NavTab(
-      label: 'Requests',
+      label: userType == UserType.driver ? 'Requests' : 'Job',
       iconAssetPath: 'assets/images/clipboard1.png',
-      destinationBuilder: (_) => const HomePage(), // TEMP
+      destinationBuilder: (_) => userType == UserType.driver
+          ? const HomePage(userType: UserType.driver)
+          : const AssistanceProviderHomePage(
+              userType: UserType.assistanceProvider,
+            ),
     ),
     _NavTab(
       label: 'Vehicle',
@@ -74,7 +84,11 @@ class AppBottomNavBarDriver extends StatelessWidget {
     _NavTab(
       label: 'More',
       iconAssetPath: 'assets/images/application1.png',
-      destinationBuilder: (_) => const HomePage(), // TEMP
+      destinationBuilder: (_) => userType == UserType.driver
+          ? const HomePage(userType: UserType.driver)
+          : const AssistanceProviderHomePage(
+              userType: UserType.assistanceProvider,
+            ),
     ),
   ];
 

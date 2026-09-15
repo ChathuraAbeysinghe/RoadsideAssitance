@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../_share/navbar/app_bottom_nav_bar_assisstance_provider.dart';
+import '../../entities/app_user.dart';
+import '../_share/navbar/app_bottom_nav_bar.dart';
 
 class AssistanceProviderHomePage extends StatefulWidget {
+  final UserType userType;
   final String userName;
   final String profileImagePath;
 
   const AssistanceProviderHomePage({
     super.key,
+    this.userType = UserType.assistanceProvider,
     this.userName = 'Assistant',
     this.profileImagePath = '',
   });
@@ -549,7 +552,10 @@ class _AssistanceProviderHomePageState
             // Home is tab index 0. All four tabs, icons, and destinations
             // (plus the signed-in user's uid) are handled inside the nav
             // bar itself — nothing to wire up here.
-            child: const AppBottomNavBarAssisstanceProvider(activeIndex: 0),
+            child: AppBottomNavBar(
+              userType: widget.userType,
+              activeIndex: 0,
+            ),
           ),
         ],
       ),

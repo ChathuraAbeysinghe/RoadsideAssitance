@@ -2,14 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../entities/app_user.dart';
 import '../_share/navbar/app_bottom_nav_bar.dart';
 
 class HomePage extends StatefulWidget {
+  final UserType userType;
   final String userName;
   final String profileImagePath;
 
   const HomePage({
     super.key,
+    this.userType = UserType.driver,
     this.userName = 'Driver',
     this.profileImagePath = '',
   });
@@ -345,7 +348,10 @@ class _HomePageState extends State<HomePage> {
                       // up here.
                       Align(
                         alignment: Alignment.bottomCenter,
-                        child: const AppBottomNavBarDriver(activeIndex: 0),
+                        child: AppBottomNavBar(
+                          userType: widget.userType,
+                          activeIndex: 0,
+                        ),
                       ),
                     ],
                   ),

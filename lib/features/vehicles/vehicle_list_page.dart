@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../entities/app_user.dart';
 import '../../entities/vehicle.dart';
-import '../_share/navbar/app_bottom_nav_bar_assisstance_provider.dart';
+import '../_share/navbar/app_bottom_nav_bar.dart';
 import 'add_vehicle_page.dart';
 
 enum _VehicleAction { edit, setActive, remove }
@@ -10,10 +11,12 @@ enum _VehicleAction { edit, setActive, remove }
 class _VehicleListData {
   final List<Vehicle> vehicles;
   final String? activeVehicleId;
+  final UserType userType;
 
   const _VehicleListData({
     required this.vehicles,
     required this.activeVehicleId,
+    required this.userType,
   });
 }
 
@@ -55,11 +58,14 @@ class _VehicleListPageState extends State<VehicleListPage> {
 
     final vehicles = results[0] as List<Vehicle>;
     final userDoc = results[1] as DocumentSnapshot<Map<String, dynamic>>;
-    final activeVehicleId = userDoc.data()?['activeVehicleId'] as String?;
+    final userData = userDoc.data() ?? <String, dynamic>{};
+    final activeVehicleId = userData['activeVehicleId'] as String?;
+    final userType = UserTypeX.fromString(userData['userType'] as String);
 
     return _VehicleListData(
       vehicles: vehicles,
       activeVehicleId: activeVehicleId,
+      userType: userType,
     );
   }
 
@@ -268,8 +274,14 @@ class _VehicleListPageState extends State<VehicleListPage> {
           ],
         ),
       ),
-      bottomNavigationBar: const AppBottomNavBarAssisstanceProvider(
-        activeIndex: 2,
+      bottomNavigationBar: FutureBuilder<_VehicleListData>(
+        future: _dataFuture,
+        builder: (context, snapshot) {
+          final userType = snapshot.data?.userType;
+          if (userType == null) return const SizedBox.shrink();
+
+          return AppBottomNavBar(userType: userType, activeIndex: 2);
+        },
       ),
     );
   }
