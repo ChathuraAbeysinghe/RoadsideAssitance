@@ -2,12 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../entities/app_user.dart';
+import '../_share/navbar/app_bottom_nav_bar.dart';
+
 class HomePage extends StatefulWidget {
+  final UserType userType;
   final String userName;
   final String profileImagePath;
 
   const HomePage({
     super.key,
+    this.userType = UserType.driver,
     this.userName = 'Driver',
     this.profileImagePath = '',
   });
@@ -337,9 +342,16 @@ class _HomePageState extends State<HomePage> {
                       ),
 
                       // Bottom navigation bar overlays the scrollable content.
+                      // Home is tab index 0. All four tabs, icons, and
+                      // destinations (plus the signed-in user's uid) are
+                      // handled inside the nav bar itself — nothing to wire
+                      // up here.
                       Align(
                         alignment: Alignment.bottomCenter,
-                        child: _BottomNavBar(),
+                        child: AppBottomNavBar(
+                          userType: widget.userType,
+                          activeIndex: 0,
+                        ),
                       ),
                     ],
                   ),
@@ -407,86 +419,6 @@ class _ServiceItem extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _BottomNavBar extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-
-    return Container(
-      width: double.infinity,
-      height: 86 + bottomInset,
-      padding: EdgeInsets.only(top: 10, bottom: bottomInset),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: const [
-          _NavItem(
-            label: 'Home',
-            iconPath: 'assets/images/home2.png',
-            isActive: true,
-          ),
-          _NavItem(label: 'Requests', iconPath: 'assets/images/clipboard1.png'),
-          _NavItem(label: 'Vehicle', iconPath: 'assets/images/wheel1.png'),
-          _NavItem(label: 'More', iconPath: 'assets/images/application1.png'),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final String label;
-  final String iconPath;
-  final bool isActive;
-
-  const _NavItem({
-    required this.label,
-    required this.iconPath,
-    this.isActive = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Colors.grey.shade600;
-    final imageColor = isActive ? null : color;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Image.asset(
-          iconPath,
-          height: 24,
-          width: 24,
-          color: imageColor,
-          errorBuilder: (context, error, stackTrace) =>
-              Icon(Icons.circle_outlined, size: 24, color: color),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: color,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 }

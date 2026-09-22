@@ -1,3 +1,5 @@
+import 'vehicle.dart';
+
 // ============================================================
 // User type & service type enums
 // ============================================================
@@ -133,6 +135,11 @@ abstract class AppUser {
   final GeoLocation currentLocation;
   final Rating rating;
 
+  /// Document ID of this user's currently active Vehicle (in the
+  /// top-level `vehicles` collection), or null if none is set / the
+  /// user owns no vehicles yet.
+  final String? activeVehicleId;
+
   AppUser({
     required this.uid,
     required this.phoneNumber,
@@ -141,6 +148,7 @@ abstract class AppUser {
     this.profileImagePath = '',
     this.currentLocation = const GeoLocation(latitude: 0, longitude: 0),
     this.rating = const Rating(),
+    this.activeVehicleId,
   });
 
   Map<String, dynamic> toMap();
@@ -158,6 +166,7 @@ class Driver extends AppUser {
     super.profileImagePath,
     super.currentLocation,
     super.rating,
+    super.activeVehicleId,
   }) : super(userType: UserType.driver);
 
   factory Driver.fromMap(String uid, Map<String, dynamic> map) => Driver(
@@ -169,6 +178,7 @@ class Driver extends AppUser {
       map['currentLocation'] as Map<String, dynamic>?,
     ),
     rating: Rating.fromMap(map['rating'] as Map<String, dynamic>?),
+    activeVehicleId: map['activeVehicleId'] as String?,
   );
 
   Driver copyWith({
@@ -176,6 +186,7 @@ class Driver extends AppUser {
     String? profileImagePath,
     GeoLocation? currentLocation,
     Rating? rating,
+    String? activeVehicleId,
   }) {
     return Driver(
       uid: uid,
@@ -184,6 +195,7 @@ class Driver extends AppUser {
       profileImagePath: profileImagePath ?? this.profileImagePath,
       currentLocation: currentLocation ?? this.currentLocation,
       rating: rating ?? this.rating,
+      activeVehicleId: activeVehicleId ?? this.activeVehicleId,
     );
   }
 
@@ -195,6 +207,7 @@ class Driver extends AppUser {
     'profileImagePath': profileImagePath,
     'currentLocation': currentLocation.toMap(),
     'rating': rating.toMap(),
+    'activeVehicleId': activeVehicleId,
   };
 }
 
@@ -213,6 +226,7 @@ class AssistanceProvider extends AppUser {
     super.profileImagePath,
     super.currentLocation,
     super.rating,
+    super.activeVehicleId,
     required this.services,
     this.isAvailable = true,
   }) : super(userType: UserType.assistanceProvider);
@@ -227,6 +241,7 @@ class AssistanceProvider extends AppUser {
         map['currentLocation'] as Map<String, dynamic>?,
       ),
       rating: Rating.fromMap(map['rating'] as Map<String, dynamic>?),
+      activeVehicleId: map['activeVehicleId'] as String?,
       isAvailable: map['isAvailable'] as bool? ?? true,
       services: ((map['services'] as List<dynamic>?) ?? [])
           .map((s) => ServiceTypeX.fromString(s as String))
@@ -239,6 +254,7 @@ class AssistanceProvider extends AppUser {
     String? profileImagePath,
     GeoLocation? currentLocation,
     Rating? rating,
+    String? activeVehicleId,
     Set<ServiceType>? services,
     bool? isAvailable,
   }) {
@@ -249,6 +265,7 @@ class AssistanceProvider extends AppUser {
       profileImagePath: profileImagePath ?? this.profileImagePath,
       currentLocation: currentLocation ?? this.currentLocation,
       rating: rating ?? this.rating,
+      activeVehicleId: activeVehicleId ?? this.activeVehicleId,
       services: services ?? this.services,
       isAvailable: isAvailable ?? this.isAvailable,
     );
@@ -262,6 +279,7 @@ class AssistanceProvider extends AppUser {
     'profileImagePath': profileImagePath,
     'currentLocation': currentLocation.toMap(),
     'rating': rating.toMap(),
+    'activeVehicleId': activeVehicleId,
     'services': services.map((s) => s.name).toList(),
     'isAvailable': isAvailable,
   };
