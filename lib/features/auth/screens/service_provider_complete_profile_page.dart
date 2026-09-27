@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../entities/app_user.dart';
 import '../../../cloudinary_service.dart';
-import '../../home/assistance_provider_home_page.dart'; // TODO: replace with a real provider home page once it exists.
+import '../../service_provider/screens/provider_home_page.dart';
 
 /// Static content describing what a service actually involves, so a
 /// provider can make an informed choice before selecting it. Edit the
@@ -213,8 +213,8 @@ class _ServiceProviderCompleteProfilePageState
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         // TODO: swap for a real provider home page (e.g.
-        // AssistanceProviderHomePage) once it exists.
-        builder: (_) => AssistanceProviderHomePage(
+        // ProviderHomePage) once it exists.
+        builder: (_) => ProviderHomePage(
           userName: provider.name,
           profileImagePath: provider.profileImagePath,
         ),

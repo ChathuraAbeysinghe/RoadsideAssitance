@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../../../entities/app_user.dart';
 import '../../home/home_page.dart';
-import '../../home/assistance_provider_home_page.dart';
+import '../../service_provider/screens/provider_home_page.dart';
+import '../../service_provider/screens/provider_profile_page.dart';
+import '../../service_provider/screens/provider_services_page.dart';
 import '../../vehicles/vehicle_list_page.dart';
 
 /// One tab in [AppBottomNavBar]. Fully internal now — hosting pages never
@@ -63,32 +65,30 @@ class AppBottomNavBar extends StatelessWidget {
       iconAssetPath: 'assets/images/home2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
-          : const AssistanceProviderHomePage(
-              userType: UserType.assistanceProvider,
-            ),
+          : const ProviderHomePage(userType: UserType.assistanceProvider),
     ),
     _NavTab(
       label: userType == UserType.driver ? 'Requests' : 'Job',
       iconAssetPath: 'assets/images/clipboard1.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
-          : const AssistanceProviderHomePage(
-              userType: UserType.assistanceProvider,
-            ),
+          : const ProviderHomePage(userType: UserType.assistanceProvider),
     ),
     _NavTab(
-      label: 'Vehicle',
-      iconAssetPath: 'assets/images/wheel1.png',
-      destinationBuilder: (_) => VehicleListPage(uid: _uid),
+      label: userType == UserType.driver ? 'Vehicle' : 'Services',
+      iconAssetPath: userType == UserType.driver
+          ? 'assets/images/wheel1.png'
+          : 'assets/images/clipboard1.png',
+      destinationBuilder: (_) => userType == UserType.driver
+          ? VehicleListPage(uid: _uid)
+          : ProviderServicesPage(uid: _uid),
     ),
     _NavTab(
       label: 'More',
       iconAssetPath: 'assets/images/application1.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
-          : const AssistanceProviderHomePage(
-              userType: UserType.assistanceProvider,
-            ),
+          : const ProviderProfilePage(),
     ),
   ];
 

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'entities/app_user.dart';
 import 'features/auth/screens/welcome_page.dart';
 import 'features/home/home_page.dart';
-import 'features/home/assistance_provider_home_page.dart';
+import 'features/service_provider/screens/provider_home_page.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -58,7 +58,7 @@ class AuthGate extends StatelessWidget {
 class _AuthenticatedRoute extends StatelessWidget {
   final String uid;
 
-  const _AuthenticatedRoute({super.key, required this.uid});
+  const _AuthenticatedRoute({required this.uid});
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +100,7 @@ class _AuthenticatedRoute extends StatelessWidget {
           profileImagePath: user.profileImagePath,
         );
       case UserType.assistanceProvider:
-        return AssistanceProviderHomePage(
+        return ProviderHomePage(
           userType: user.userType,
           userName: user.name,
           profileImagePath: user.profileImagePath,
@@ -191,7 +191,7 @@ class _LoadingScreenState extends State<_LoadingScreen>
 class _ErrorScreen extends StatelessWidget {
   final String message;
 
-  const _ErrorScreen({super.key, required this.message});
+  const _ErrorScreen({required this.message});
 
   @override
   Widget build(BuildContext context) {
