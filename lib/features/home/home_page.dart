@@ -98,7 +98,9 @@ class _HomePageState extends State<HomePage> {
                 height: 48,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(
+                    color: const Color.fromARGB(255, 196, 196, 196),
+                  ),
                 ),
                 child: ClipOval(
                   child: profileImagePath.isEmpty
@@ -133,7 +135,7 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         _greeting,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           color: Colors.grey.shade600,
                         ),
                       ),
@@ -143,8 +145,8 @@ class _HomePageState extends State<HomePage> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                           color: Colors.black,
                         ),
                       ),
@@ -168,33 +170,37 @@ class _HomePageState extends State<HomePage> {
     const shadows = [
       Shadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1)),
     ];
-    return const Padding(
-      padding: EdgeInsets.only(bottom: 0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '24/7 Roadside Assistance',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              shadows: shadows,
+    return const Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        // Lower this number to push the text further down, raise it to move it up.
+        padding: EdgeInsets.only(bottom: 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '24/7 Roadside Assistance',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                shadows: shadows,
+              ),
             ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Anywhere Across the Island',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              shadows: shadows,
+            SizedBox(height: 4),
+            Text(
+              'Anywhere Across the Island',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                shadows: shadows,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -202,9 +208,10 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.of(context).padding.top;
-    const headerContentHeight = 100.0; // avatar row area
+    const headerContentHeight = 72.0; // avatar row area
     const heroTextAreaHeight = 120.0; // visible hero height above white card
     const heroOverlap = 50.0; // hero image extends behind the card corners
+    const heroRaise = 20.0; // how much higher the hero image starts
 
     final headerHeight = topInset + headerContentHeight;
 
@@ -212,13 +219,13 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Hero image (red banner) sits just below the header,
+          // Hero image (red banner) starts higher (behind the header row)
           // and extends behind the rounded top of the white card.
           Positioned(
-            top: headerHeight,
+            top: headerHeight - heroRaise,
             left: 0,
             right: 0,
-            height: heroTextAreaHeight + heroOverlap,
+            height: heroTextAreaHeight + heroOverlap + heroRaise,
             child: Image.asset(
               'assets/images/hero.png',
               fit: BoxFit.cover,
