@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../entities/app_user.dart';
@@ -7,15 +9,8 @@ import '../_share/navbar/app_bottom_nav_bar.dart';
 
 class HomePage extends StatefulWidget {
   final UserType userType;
-  final String userName;
-  final String profileImagePath;
 
-  const HomePage({
-    super.key,
-    this.userType = UserType.driver,
-    this.userName = 'Driver',
-    this.profileImagePath = '',
-  });
+  const HomePage({super.key, this.userType = UserType.driver});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -29,6 +24,7 @@ class _HomePageState extends State<HomePage> {
   ];
 
   late final PageController _heroController;
+  late final Future<AppUser?> _userFuture;
   Timer? _heroTimer;
   int _currentHeroPage = 0;
 
@@ -42,8 +38,22 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _userFuture = _loadCurrentUser();
     _heroController = PageController(initialPage: 0);
     _startHeroTimer();
+  }
+
+  Future<AppUser?> _loadCurrentUser() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+
+    final document = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+    final data = document.data();
+    if (!document.exists || data == null) return null;
+    return userFromMap(uid, data);
   }
 
   void _startHeroTimer() {
@@ -86,65 +96,77 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             children: [
               // Fixed header and search bar
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color.fromARGB(0, 212, 211, 211),
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: widget.profileImagePath.isEmpty
-                            ? Image.asset(
-                                'assets/images/profile.png',
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                              )
-                            : Image.network(
-                                widget.profileImagePath,
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Image.asset(
-                                      'assets/images/profile.png',
-                                      width: 48,
-                                      height: 48,
-                                      fit: BoxFit.cover,
-                                    ),
-                              ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'Hi ${widget.userName},\n$_greeting',
-                          style: const TextStyle(
-                            fontSize: 15,
+              FutureBuilder<AppUser?>(
+                future: _userFuture,
+                builder: (context, snapshot) {
+                  final appUser = snapshot.data;
+                  final userName = appUser?.name.trim().isNotEmpty == true
+                      ? appUser!.name
+                      : 'Driver';
+                  final profileImagePath = appUser?.profileImagePath ?? '';
 
-                            fontWeight: FontWeight.w500,
-                            height: 1.3,
-                            color: Color.fromARGB(255, 0, 0, 0),
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color.fromARGB(0, 212, 211, 211),
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: profileImagePath.isEmpty
+                                ? Image.asset(
+                                    'assets/images/profile.png',
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.network(
+                                    profileImagePath,
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            Image.asset(
+                                              'assets/images/profile.png',
+                                              width: 48,
+                                              height: 48,
+                                              fit: BoxFit.cover,
+                                            ),
+                                  ),
                           ),
                         ),
-                      ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              'Hi $userName,\n$_greeting',
+                              style: const TextStyle(
+                                fontSize: 15,
+
+                                fontWeight: FontWeight.w500,
+                                height: 1.3,
+                                color: Color.fromARGB(255, 0, 0, 0),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.notifications_none,
+                          size: 26,
+                          color: Colors.black87,
+                        ),
+                      ],
                     ),
-                    Icon(
-                      Icons.notifications_none,
-                      size: 26,
-                      color: Colors.black87,
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
               Expanded(
                 child: Container(
