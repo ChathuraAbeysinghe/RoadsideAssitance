@@ -17,6 +17,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // Set to false if hero.png already contains the "24/7 Roadside Assistance" text.
+  static const bool _showHeroText = true;
+
   // Add / remove image paths here — the carousel adapts to however many you put.
   final List<String> _heroImages = const [
     'assets/images/fuelstation.jpg',
@@ -30,9 +33,9 @@ class _HomePageState extends State<HomePage> {
 
   String get _greeting {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning!';
-    if (hour < 17) return 'Good Afternoon!';
-    return 'Good Evening!';
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
   }
 
   @override
@@ -76,98 +79,177 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.centerRight,
-            colors: [
-              Color.fromARGB(255, 255, 195, 66),
-              Color.fromARGB(255, 255, 240, 153),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              // Fixed header and search bar
-              FutureBuilder<AppUser?>(
-                future: _userFuture,
-                builder: (context, snapshot) {
-                  final appUser = snapshot.data;
-                  final userName = appUser?.name.trim().isNotEmpty == true
-                      ? appUser!.name
-                      : 'Driver';
-                  final profileImagePath = appUser?.profileImagePath ?? '';
+  Widget _buildHeader() {
+    return FutureBuilder<AppUser?>(
+      future: _userFuture,
+      builder: (context, snapshot) {
+        final appUser = snapshot.data;
+        final userName = appUser?.name.trim().isNotEmpty == true
+            ? appUser!.name
+            : 'Driver';
+        final profileImagePath = appUser?.profileImagePath ?? '';
 
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: ClipOval(
+                  child: profileImagePath.isEmpty
+                      ? Image.asset(
+                          'assets/images/profile.png',
                           width: 48,
                           height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color.fromARGB(0, 212, 211, 211),
-                            ),
-                          ),
-                          child: ClipOval(
-                            child: profileImagePath.isEmpty
-                                ? Image.asset(
-                                    'assets/images/profile.png',
-                                    width: 48,
-                                    height: 48,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Image.network(
-                                    profileImagePath,
-                                    width: 48,
-                                    height: 48,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            Image.asset(
-                                              'assets/images/profile.png',
-                                              width: 48,
-                                              height: 48,
-                                              fit: BoxFit.cover,
-                                            ),
-                                  ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              'Hi $userName,\n$_greeting',
-                              style: const TextStyle(
-                                fontSize: 15,
-
-                                fontWeight: FontWeight.w500,
-                                height: 1.3,
-                                color: Color.fromARGB(255, 0, 0, 0),
+                          fit: BoxFit.cover,
+                        )
+                      : Image.network(
+                          profileImagePath,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Image.asset(
+                                'assets/images/profile.png',
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
                               ),
-                            ),
-                          ),
                         ),
-                        Icon(
-                          Icons.notifications_none,
-                          size: 26,
-                          color: Colors.black87,
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                ),
               ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _greeting,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        userName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.notifications_none,
+                size: 26,
+                color: Colors.black87,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeroTextOverlay() {
+    const shadows = [
+      Shadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1)),
+    ];
+    return const Padding(
+      padding: EdgeInsets.only(bottom: 0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '24/7 Roadside Assistance',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              shadows: shadows,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Anywhere Across the Island',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              shadows: shadows,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
+    const headerContentHeight = 100.0; // avatar row area
+    const heroTextAreaHeight = 120.0; // visible hero height above white card
+    const heroOverlap = 50.0; // hero image extends behind the card corners
+
+    final headerHeight = topInset + headerContentHeight;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          // Hero image (red banner) sits just below the header,
+          // and extends behind the rounded top of the white card.
+          Positioned(
+            top: headerHeight,
+            left: 0,
+            right: 0,
+            height: heroTextAreaHeight + heroOverlap,
+            child: Image.asset(
+              'assets/images/hero.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              errorBuilder: (context, error, stackTrace) =>
+                  Container(color: const Color(0xFFE30613)),
+            ),
+          ),
+
+          Column(
+            children: [
+              // Header (avatar, greeting, bell)
+              SizedBox(
+                height: headerHeight,
+                child: Padding(
+                  padding: EdgeInsets.only(top: topInset),
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: _buildHeader(),
+                  ),
+                ),
+              ),
+
+              // Hero title text area
+              SizedBox(
+                height: heroTextAreaHeight,
+                width: double.infinity,
+                child: _showHeroText ? _buildHeroTextOverlay() : null,
+              ),
+
+              // White rounded content card
               Expanded(
                 child: Container(
                   clipBehavior: Clip.antiAlias,
@@ -191,9 +273,8 @@ class _HomePageState extends State<HomePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 5),
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                              padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
                               child: Container(
                                 height: 52,
                                 padding: const EdgeInsets.symmetric(
@@ -213,7 +294,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     const SizedBox(width: 10),
                                     Text(
-                                      'What service do you need?',
+                                      'What service do you need ?',
                                       style: TextStyle(
                                         fontSize: 15,
                                         color: Colors.grey.shade500,
@@ -261,9 +342,9 @@ class _HomePageState extends State<HomePage> {
                                     children: [
                                       Expanded(
                                         child: _ServiceItem(
-                                          label: 'Request Fuel',
+                                          label: 'Jump Start',
                                           imagePath:
-                                              'assets/images/outoffuel.png',
+                                              'assets/images/jumpstart.png',
                                           height: 60,
                                         ),
                                       ),
@@ -279,9 +360,9 @@ class _HomePageState extends State<HomePage> {
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: _ServiceItem(
-                                          label: 'Jump Start',
+                                          label: 'Fuel Delivery',
                                           imagePath:
-                                              'assets/images/jumpstart.png',
+                                              'assets/images/outoffuel.png',
                                           height: 60,
                                         ),
                                       ),
@@ -291,17 +372,16 @@ class _HomePageState extends State<HomePage> {
                                 ],
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
                               child: SizedBox(
                                 width: double.infinity,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: const [
+                                  children: [
                                     SizedBox(height: 6),
-
                                     Text(
-                                      'Explore Other Services',
+                                      'Explore Nearby',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 18,
@@ -313,7 +393,8 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            // Auto-rotating hero carousel (changes image every 5 seconds).
+
+                            // Auto-rotating carousel
                             Padding(
                               padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                               child: Container(
@@ -364,10 +445,6 @@ class _HomePageState extends State<HomePage> {
                       ),
 
                       // Bottom navigation bar overlays the scrollable content.
-                      // Home is tab index 0. All four tabs, icons, and
-                      // destinations (plus the signed-in user's uid) are
-                      // handled inside the nav bar itself — nothing to wire
-                      // up here.
                       Align(
                         alignment: Alignment.bottomCenter,
                         child: AppBottomNavBar(
@@ -381,7 +458,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
