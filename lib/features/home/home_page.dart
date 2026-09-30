@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../entities/app_user.dart';
 import '../_share/navbar/app_bottom_nav_bar.dart';
+import '../request_service/request_service.dart';
 
 class HomePage extends StatefulWidget {
   final UserType userType;
@@ -70,6 +71,15 @@ class _HomePageState extends State<HomePage> {
         curve: Curves.easeInOut,
       );
     });
+  }
+
+  void _openService(ServiceType type) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            RequestServicePage(serviceType: type, userType: widget.userType),
+      ),
+    );
   }
 
   @override
@@ -329,6 +339,9 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Vehicle Tow',
                                           imagePath: 'assets/images/towing.png',
                                           height: 110,
+                                          onTap: () => _openService(
+                                            ServiceType.towTruck,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 14),
@@ -338,6 +351,9 @@ class _HomePageState extends State<HomePage> {
                                           imagePath:
                                               'assets/images/mechanic.png',
                                           height: 110,
+                                          onTap: () => _openService(
+                                            ServiceType.mechanic,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -353,6 +369,9 @@ class _HomePageState extends State<HomePage> {
                                           imagePath:
                                               'assets/images/jumpstart.png',
                                           height: 60,
+                                          onTap: () => _openService(
+                                            ServiceType.batteryBoost,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -362,6 +381,9 @@ class _HomePageState extends State<HomePage> {
                                           imagePath:
                                               'assets/images/flattire.png',
                                           height: 60,
+                                          onTap: () => _openService(
+                                            ServiceType.flatTireChange,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -371,6 +393,9 @@ class _HomePageState extends State<HomePage> {
                                           imagePath:
                                               'assets/images/outoffuel.png',
                                           height: 60,
+                                          onTap: () => _openService(
+                                            ServiceType.fuelDelivery,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -475,55 +500,61 @@ class _ServiceItem extends StatelessWidget {
   final String label;
   final String imagePath;
   final double height;
+  final VoidCallback onTap;
 
   const _ServiceItem({
     required this.label,
     required this.imagePath,
     required this.height,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Image.asset(
-              imagePath,
-              height: height,
-              width: double.infinity,
-              fit: BoxFit.fitWidth,
-              errorBuilder: (context, error, stackTrace) => Container(
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Image.asset(
+                imagePath,
                 height: height,
                 width: double.infinity,
-                color: Colors.grey.shade300,
-                child: const Icon(
-                  Icons.image_not_supported_outlined,
-                  color: Colors.grey,
+                fit: BoxFit.fitWidth,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: height,
+                  width: double.infinity,
+                  color: Colors.grey.shade300,
+                  child: const Icon(
+                    Icons.image_not_supported_outlined,
+                    color: Colors.grey,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
       ),
     );
   }
