@@ -82,12 +82,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
     if (!mounted) return;
 
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => HomePage(
-          userName: user.name,
-          profileImagePath: user.profileImagePath,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => const HomePage()),
       (route) => false,
     );
   }
