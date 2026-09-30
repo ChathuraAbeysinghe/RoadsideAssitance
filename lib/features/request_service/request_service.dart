@@ -163,6 +163,10 @@ class RequestServicePage extends StatefulWidget {
 class _RequestServicePageState extends State<RequestServicePage> {
   static const Color _brandRed = Color(0xFFE30613);
 
+  // How far the map extends under the sheet so its rounded corners
+  // don't show a white gap.
+  static const double _mapUnderlap = 30;
+
   // Malabe fallback until live location is available.
   static final LatLng _initialCenter = LatLng(6.9061, 79.9697);
 
@@ -193,60 +197,67 @@ class _RequestServicePageState extends State<RequestServicePage> {
   // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
+      body: Column(
         children: [
-          Positioned.fill(child: _buildMap()),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 16, top: 8),
-              child: _circleButton(
-                icon: Icons.chevron_left,
-                onTap: () => Navigator.of(context).pop(),
-              ),
-            ),
-          ),
-          // OpenStreetMap requires visible attribution.
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topRight,
-              child: Container(
-                margin: const EdgeInsets.only(top: 4, right: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                color: Colors.white.withValues(alpha: 0.75),
-                child: const Text(
-                  '© OpenStreetMap contributors',
-                  style: TextStyle(fontSize: 10, color: Colors.black87),
-                ),
-              ),
-            ),
-          ),
-          if (_pickingOnMap) _buildPickingBanner(),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
+          // Map area: top part of the screen, or full screen while picking.
+          Expanded(
+            child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                Padding(
-                  padding: EdgeInsets.only(
-                    right: 16,
-                    bottom: _pickingOnMap
-                        ? 24 + MediaQuery.of(context).padding.bottom
-                        : 12,
+                // Map runs slightly under the sheet (paints beneath it).
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: -_mapUnderlap,
+                  child: _buildMap(),
+                ),
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16, top: 8),
+                    child: _circleButton(
+                      icon: Icons.chevron_left,
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
                   ),
+                ),
+                // OpenStreetMap requires visible attribution.
+                SafeArea(
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 4, right: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      color: Colors.white.withValues(alpha: 0.75),
+                      child: const Text(
+                        '© OpenStreetMap contributors',
+                        style: TextStyle(fontSize: 10, color: Colors.black87),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_pickingOnMap) _buildPickingBanner(),
+                Positioned(
+                  right: 16,
+                  bottom: _pickingOnMap ? 24 + bottomInset : 16 + _mapUnderlap,
                   child: _circleButton(
                     icon: Icons.my_location,
                     size: 52,
                     onTap: _goToMyLocation,
                   ),
                 ),
-                // Hide the sheet while picking so the whole map is tappable.
-                if (!_pickingOnMap) _buildSheet(),
               ],
             ),
           ),
+          // Hide the sheet while picking so the whole map is visible.
+          if (!_pickingOnMap) _buildSheet(),
         ],
       ),
     );
@@ -276,7 +287,9 @@ class _RequestServicePageState extends State<RequestServicePage> {
               ),
             ],
           ),
+        // rotate: true keeps the pins upright when the map is rotated.
         MarkerLayer(
+          rotate: true,
           markers: [
             if (_pickup != null)
               Marker(
@@ -365,53 +378,62 @@ class _RequestServicePageState extends State<RequestServicePage> {
   }
 
   Widget _buildSheet() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        16,
-        10,
-        16,
-        16 + MediaQuery.of(context).padding.bottom,
+    return ConstrainedBox(
+      // Keeps the map visible even on small screens / with the keyboard open.
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.65,
       ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 15,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(3),
-              ),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+          16,
+          10,
+          16,
+          16 + MediaQuery.of(context).padding.bottom,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 15,
+              offset: const Offset(0, -3),
             ),
-            const SizedBox(height: 14),
-            Text(
-              _config.title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _config.subtitle,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 20),
-            _buildServiceDetails(),
-            const SizedBox(height: 20),
-            _buildConfirmButton(),
           ],
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                _config.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _config.subtitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 20),
+              _buildServiceDetails(),
+              const SizedBox(height: 20),
+              _buildConfirmButton(),
+            ],
+          ),
         ),
       ),
     );
@@ -733,16 +755,11 @@ class _RequestServicePageState extends State<RequestServicePage> {
       _durationMin = (result.durationSeconds / 60).round();
     });
 
-    // Leave room at the bottom for the sheet.
+    // The map now sits above the sheet, so only small paddings are needed.
     _mapController.fitCamera(
       CameraFit.coordinates(
         coordinates: result.points,
-        padding: EdgeInsets.fromLTRB(
-          40,
-          100,
-          40,
-          MediaQuery.of(context).size.height * 0.5,
-        ),
+        padding: const EdgeInsets.fromLTRB(50, 100, 50, 80),
       ),
     );
   }
