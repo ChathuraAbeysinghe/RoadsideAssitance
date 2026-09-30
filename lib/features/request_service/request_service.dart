@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -184,10 +185,18 @@ class _RequestServicePageState extends State<RequestServicePage> {
   int? _durationMin;
   bool _loadingRoute = false;
 
+  // Live user location
+  LatLng? _userLocation;
+  double _userAccuracy = 0;
+  bool _locatingUser = true;
+  bool _hasCenteredOnUser = false;
+  StreamSubscription<Position>? _positionSub;
+
   _ServiceConfig get _config => _serviceConfigs[widget.serviceType]!;
 
   @override
   void dispose() {
+    _positionSub?.cancel();
     _mapController.dispose();
     _pickupController.dispose();
     _dropoffController.dispose();
@@ -253,6 +262,7 @@ class _RequestServicePageState extends State<RequestServicePage> {
                     onTap: _goToMyLocation,
                   ),
                 ),
+                if (_locatingUser) _buildLocatingOverlay(),
               ],
             ),
           ),
@@ -269,7 +279,7 @@ class _RequestServicePageState extends State<RequestServicePage> {
       options: MapOptions(
         initialCenter: _initialCenter,
         initialZoom: 15,
-        onMapReady: _useCurrentLocationAsPickup,
+        onMapReady: _startLocationTracking,
         onTap: (_, point) => _onMapTap(point),
       ),
       children: [
@@ -277,6 +287,20 @@ class _RequestServicePageState extends State<RequestServicePage> {
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: _appPackageName,
         ),
+        // GPS accuracy circle
+        if (_userLocation != null && _userAccuracy > 0)
+          CircleLayer(
+            circles: [
+              CircleMarker(
+                point: _userLocation!,
+                radius: _userAccuracy,
+                useRadiusInMeter: true,
+                color: Colors.blue.withValues(alpha: 0.12),
+                borderColor: Colors.blue.withValues(alpha: 0.4),
+                borderStrokeWidth: 1,
+              ),
+            ],
+          ),
         if (_routePoints.isNotEmpty)
           PolylineLayer(
             polylines: [
@@ -291,6 +315,23 @@ class _RequestServicePageState extends State<RequestServicePage> {
         MarkerLayer(
           rotate: true,
           markers: [
+            // Live user location (blue dot), drawn first so pins sit on top.
+            if (_userLocation != null)
+              Marker(
+                point: _userLocation!,
+                width: 22,
+                height: 22,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 3),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black26, blurRadius: 4),
+                    ],
+                  ),
+                ),
+              ),
             if (_pickup != null)
               Marker(
                 point: _pickup!,
@@ -298,13 +339,17 @@ class _RequestServicePageState extends State<RequestServicePage> {
                 height: 48,
                 // Pin tip sits on the exact coordinate.
                 alignment: Alignment.topCenter,
-                child: Image.asset(
-                  _pickupPinPath,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.location_on,
-                    color: Colors.green,
-                    size: 40,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _startRepick(_PickTarget.pickup),
+                  child: Image.asset(
+                    _pickupPinPath,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.location_on,
+                      color: Colors.green,
+                      size: 40,
+                    ),
                   ),
                 ),
               ),
@@ -314,15 +359,44 @@ class _RequestServicePageState extends State<RequestServicePage> {
                 width: 40,
                 height: 40,
                 alignment: Alignment.topCenter,
-                child: const Icon(
-                  Icons.location_on,
-                  color: Color.fromARGB(255, 0, 0, 0),
-                  size: 40,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _startRepick(_PickTarget.dropoff),
+                  child: const Icon(
+                    Icons.location_on,
+                    color: Color.fromARGB(255, 0, 0, 0),
+                    size: 40,
+                  ),
                 ),
               ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildLocatingOverlay() {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.white.withValues(alpha: 0.6),
+        alignment: Alignment.center,
+        child: Material(
+          color: Colors.white,
+          elevation: 4,
+          borderRadius: BorderRadius.circular(16),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: _brandRed),
+                SizedBox(height: 12),
+                Text('Getting your location…'),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -485,12 +559,16 @@ class _RequestServicePageState extends State<RequestServicePage> {
             children: [
               Column(
                 children: [
-                  Image.asset(
-                    _config.iconPath,
-                    width: 24,
-                    height: 24,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.local_shipping_outlined, size: 24),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _startRepick(_PickTarget.pickup),
+                    child: Image.asset(
+                      _config.iconPath,
+                      width: 24,
+                      height: 24,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.local_shipping_outlined, size: 24),
+                    ),
                   ),
                   ...List.generate(
                     4,
@@ -501,7 +579,11 @@ class _RequestServicePageState extends State<RequestServicePage> {
                       color: Colors.black87,
                     ),
                   ),
-                  const Icon(Icons.location_on_outlined, size: 24),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _startRepick(_PickTarget.dropoff),
+                    child: const Icon(Icons.location_on_outlined, size: 24),
+                  ),
                 ],
               ),
               const SizedBox(width: 16),
@@ -657,21 +739,26 @@ class _RequestServicePageState extends State<RequestServicePage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<bool> _ensureLocationPermission() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      _snack('Please turn on location services');
+      return false;
+    }
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      _snack('Location permission denied');
+      return false;
+    }
+    return true;
+  }
+
   Future<LatLng?> _getCurrentLatLng() async {
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) {
-        _snack('Please turn on location services');
-        return null;
-      }
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        _snack('Location permission denied');
-        return null;
-      }
+      if (!await _ensureLocationPermission()) return null;
       final pos = await Geolocator.getCurrentPosition();
       return LatLng(pos.latitude, pos.longitude);
     } catch (_) {
@@ -681,19 +768,81 @@ class _RequestServicePageState extends State<RequestServicePage> {
   }
 
   Future<void> _goToMyLocation() async {
-    final here = await _getCurrentLatLng();
+    final here = _userLocation ?? await _getCurrentLatLng();
     if (here == null || !mounted) return;
     _mapController.move(here, 16);
   }
 
-  /// Runs once the map is ready: prefill pickup with the device location.
-  Future<void> _useCurrentLocationAsPickup() async {
-    if (widget.serviceType != ServiceType.towTruck) return;
-    final here = await _getCurrentLatLng();
-    if (here == null || !mounted) return;
-    _mapController.move(here, 16);
-    await _setPoint(_PickTarget.pickup, here);
-    if (mounted) setState(() => _activeField = _PickTarget.dropoff);
+  /// Runs once the map is ready: gets a first fix, then streams live updates.
+  Future<void> _startLocationTracking() async {
+    try {
+      if (!await _ensureLocationPermission()) {
+        if (mounted) setState(() => _locatingUser = false);
+        return;
+      }
+
+      // Fast first fix so the spinner goes away quickly.
+      try {
+        final first = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 15),
+          ),
+        );
+        _onPosition(first);
+      } catch (_) {
+        // Fall through; the stream below may still deliver a fix.
+      }
+
+      if (!mounted) return;
+
+      // Live updates.
+      _positionSub =
+          Geolocator.getPositionStream(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 5, // metres moved before a new update
+            ),
+          ).listen(
+            _onPosition,
+            onError: (_) {
+              if (mounted) setState(() => _locatingUser = false);
+            },
+          );
+
+      // Stop the spinner even if no fix ever arrives.
+      Future.delayed(const Duration(seconds: 20), () {
+        if (mounted && _locatingUser) {
+          setState(() => _locatingUser = false);
+          _snack('Could not get your location');
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _locatingUser = false);
+    }
+  }
+
+  void _onPosition(Position pos) {
+    if (!mounted) return;
+    final here = LatLng(pos.latitude, pos.longitude);
+    final isFirstFix = !_hasCenteredOnUser;
+
+    setState(() {
+      _userLocation = here;
+      _userAccuracy = pos.accuracy;
+      _locatingUser = false;
+    });
+
+    if (isFirstFix) {
+      _hasCenteredOnUser = true;
+      _mapController.move(here, 16);
+      // Prefill pickup once with the first fix (tow truck only).
+      if (widget.serviceType == ServiceType.towTruck) {
+        _setPoint(_PickTarget.pickup, here).then((_) {
+          if (mounted) setState(() => _activeField = _PickTarget.dropoff);
+        });
+      }
+    }
   }
 
   /// Stores a point, updates its text field, then refreshes the route.
@@ -781,6 +930,16 @@ class _RequestServicePageState extends State<RequestServicePage> {
     if (_routePoints.isEmpty && mounted) {
       _mapController.move(point, 15);
     }
+  }
+
+  /// Called when a pin (map or sheet icon) is tapped: switch to that target
+  /// and let the user tap the map to choose a new spot for it.
+  void _startRepick(_PickTarget target) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _activeField = target;
+      _pickingOnMap = true;
+    });
   }
 
   void _onSetLocationOnMap() {
