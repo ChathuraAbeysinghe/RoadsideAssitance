@@ -20,7 +20,8 @@ class _ServiceConfig {
   });
 }
 
-const String _placeholderIcon = 'assets/images/icon-jerrycan.png';
+const String _placeholderIcon = 'assets/images/icon-towtruck.png';
+const String _pickupPinPath = 'assets/images/pickup-point.png';
 
 // Replace each iconPath manually later.
 const Map<ServiceType, _ServiceConfig> _serviceConfigs = {
@@ -59,8 +60,7 @@ const Map<ServiceType, _ServiceConfig> _serviceConfigs = {
 // ---------------------------------------------------------------------------
 
 /// Nominatim requires an identifying User-Agent. Put your real contact here.
-const String _userAgent =
-    'RoadsideAssistance/1.0 (kavidupurnamal@gmail.com.com)';
+const String _userAgent = 'RoadsideAssistance/1.0 (kavidupurnamal@gmail.com)';
 
 const String _appPackageName = 'com.example.roadside_assitance';
 
@@ -269,7 +269,11 @@ class _RequestServicePageState extends State<RequestServicePage> {
         if (_routePoints.isNotEmpty)
           PolylineLayer(
             polylines: [
-              Polyline(points: _routePoints, strokeWidth: 5, color: _brandRed),
+              Polyline(
+                points: _routePoints,
+                strokeWidth: 5,
+                color: const Color.fromARGB(255, 0, 0, 0),
+              ),
             ],
           ),
         MarkerLayer(
@@ -277,12 +281,18 @@ class _RequestServicePageState extends State<RequestServicePage> {
             if (_pickup != null)
               Marker(
                 point: _pickup!,
-                width: 32,
-                height: 32,
-                child: const Icon(
-                  Icons.trip_origin,
-                  color: Colors.green,
-                  size: 28,
+                width: 40,
+                height: 48,
+                // Pin tip sits on the exact coordinate.
+                alignment: Alignment.topCenter,
+                child: Image.asset(
+                  _pickupPinPath,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.location_on,
+                    color: Colors.green,
+                    size: 40,
+                  ),
                 ),
               ),
             if (_dropoff != null)
@@ -293,7 +303,7 @@ class _RequestServicePageState extends State<RequestServicePage> {
                 alignment: Alignment.topCenter,
                 child: const Icon(
                   Icons.location_on,
-                  color: _brandRed,
+                  color: Color.fromARGB(255, 0, 0, 0),
                   size: 40,
                 ),
               ),
