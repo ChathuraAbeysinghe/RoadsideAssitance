@@ -1,5 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 
 import '../../entities/app_user.dart';
 
@@ -46,6 +51,101 @@ const Map<ServiceType, _ServiceConfig> _serviceConfigs = {
   ),
 };
 
+// ---------------------------------------------------------------------------
+// Free map services (no API key / billing)
+//  - Tiles:     OpenStreetMap
+//  - Geocoding: Nominatim (max 1 request/second, no autocomplete)
+//  - Routing:   OSRM public demo server (testing only, not for production)
+// ---------------------------------------------------------------------------
+
+/// Nominatim requires an identifying User-Agent. Put your real contact here.
+const String _userAgent =
+    'RoadsideAssistance/1.0 (kavidupurnamal@gmail.com.com)';
+
+const String _appPackageName = 'com.example.roadside_assitance';
+
+class _RouteResult {
+  final List<LatLng> points;
+  final double distanceMeters;
+  final double durationSeconds;
+
+  const _RouteResult({
+    required this.points,
+    required this.distanceMeters,
+    required this.durationSeconds,
+  });
+}
+
+class _MapApi {
+  static Future<LatLng?> geocode(String query) async {
+    try {
+      final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
+        'q': query,
+        'format': 'jsonv2',
+        'limit': '1',
+        'countrycodes': 'lk', // restrict to Sri Lanka; remove if not needed
+      });
+      final res = await http.get(uri, headers: {'User-Agent': _userAgent});
+      if (res.statusCode != 200) return null;
+      final list = jsonDecode(res.body) as List;
+      if (list.isEmpty) return null;
+      return LatLng(
+        double.parse(list[0]['lat'] as String),
+        double.parse(list[0]['lon'] as String),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String?> reverseGeocode(LatLng p) async {
+    try {
+      final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+        'lat': '${p.latitude}',
+        'lon': '${p.longitude}',
+        'format': 'jsonv2',
+      });
+      final res = await http.get(uri, headers: {'User-Agent': _userAgent});
+      if (res.statusCode != 200) return null;
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data['display_name'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<_RouteResult?> route(LatLng a, LatLng b) async {
+    try {
+      // OSRM expects longitude,latitude order.
+      final uri = Uri.parse(
+        'https://router.project-osrm.org/route/v1/driving/'
+        '${a.longitude},${a.latitude};${b.longitude},${b.latitude}'
+        '?overview=full&geometries=geojson',
+      );
+      final res = await http.get(uri, headers: {'User-Agent': _userAgent});
+      if (res.statusCode != 200) return null;
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final routes = data['routes'] as List?;
+      if (routes == null || routes.isEmpty) return null;
+      final first = routes[0] as Map<String, dynamic>;
+      final coords = first['geometry']['coordinates'] as List;
+      return _RouteResult(
+        points: coords
+            .map(
+              (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+            )
+            .toList(),
+        distanceMeters: (first['distance'] as num).toDouble(),
+        durationSeconds: (first['duration'] as num).toDouble(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+enum _PickTarget { pickup, dropoff }
+
 class RequestServicePage extends StatefulWidget {
   final ServiceType serviceType;
   final UserType userType;
@@ -63,40 +163,41 @@ class RequestServicePage extends StatefulWidget {
 class _RequestServicePageState extends State<RequestServicePage> {
   static const Color _brandRed = Color(0xFFE30613);
 
-  static const CameraPosition _initialCamera = CameraPosition(
-    target: LatLng(6.9061, 79.9697), // Malabe; replace with live location
-    zoom: 15,
-  );
+  // Malabe fallback until live location is available.
+  static final LatLng _initialCenter = LatLng(6.9061, 79.9697);
 
-  GoogleMapController? _mapController;
+  final _mapController = MapController();
   final _pickupController = TextEditingController();
   final _dropoffController = TextEditingController();
+
+  _PickTarget _activeField = _PickTarget.pickup;
+  bool _pickingOnMap = false;
+
+  LatLng? _pickup;
+  LatLng? _dropoff;
+  List<LatLng> _routePoints = [];
+  double? _distanceKm;
+  int? _durationMin;
+  bool _loadingRoute = false;
 
   _ServiceConfig get _config => _serviceConfigs[widget.serviceType]!;
 
   @override
   void dispose() {
-    _mapController?.dispose();
+    _mapController.dispose();
     _pickupController.dispose();
     _dropoffController.dispose();
     super.dispose();
   }
 
+  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          Positioned.fill(
-            child: GoogleMap(
-              initialCameraPosition: _initialCamera,
-              zoomControlsEnabled: false,
-              myLocationButtonEnabled: false,
-              mapToolbarEnabled: false,
-              onMapCreated: (c) => _mapController = c,
-            ),
-          ),
+          Positioned.fill(child: _buildMap()),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.only(left: 16, top: 8),
@@ -106,6 +207,22 @@ class _RequestServicePageState extends State<RequestServicePage> {
               ),
             ),
           ),
+          // OpenStreetMap requires visible attribution.
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Container(
+                margin: const EdgeInsets.only(top: 4, right: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                color: Colors.white.withValues(alpha: 0.75),
+                child: const Text(
+                  '© OpenStreetMap contributors',
+                  style: TextStyle(fontSize: 10, color: Colors.black87),
+                ),
+              ),
+            ),
+          ),
+          if (_pickingOnMap) _buildPickingBanner(),
           Align(
             alignment: Alignment.bottomCenter,
             child: Column(
@@ -113,18 +230,105 @@ class _RequestServicePageState extends State<RequestServicePage> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(right: 16, bottom: 12),
+                  padding: EdgeInsets.only(
+                    right: 16,
+                    bottom: _pickingOnMap
+                        ? 24 + MediaQuery.of(context).padding.bottom
+                        : 12,
+                  ),
                   child: _circleButton(
                     icon: Icons.my_location,
                     size: 52,
                     onTap: _goToMyLocation,
                   ),
                 ),
-                _buildSheet(),
+                // Hide the sheet while picking so the whole map is tappable.
+                if (!_pickingOnMap) _buildSheet(),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMap() {
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: _initialCenter,
+        initialZoom: 15,
+        onMapReady: _useCurrentLocationAsPickup,
+        onTap: (_, point) => _onMapTap(point),
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: _appPackageName,
+        ),
+        if (_routePoints.isNotEmpty)
+          PolylineLayer(
+            polylines: [
+              Polyline(points: _routePoints, strokeWidth: 5, color: _brandRed),
+            ],
+          ),
+        MarkerLayer(
+          markers: [
+            if (_pickup != null)
+              Marker(
+                point: _pickup!,
+                width: 32,
+                height: 32,
+                child: const Icon(
+                  Icons.trip_origin,
+                  color: Colors.green,
+                  size: 28,
+                ),
+              ),
+            if (_dropoff != null)
+              Marker(
+                point: _dropoff!,
+                width: 40,
+                height: 40,
+                alignment: Alignment.topCenter,
+                child: const Icon(
+                  Icons.location_on,
+                  color: _brandRed,
+                  size: 40,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPickingBanner() {
+    final label = _activeField == _PickTarget.pickup ? 'pickup' : 'drop-off';
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 56, 16, 0),
+          child: Material(
+            color: Colors.white,
+            elevation: 3,
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16, right: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Tap the map to set $label'),
+                  TextButton(
+                    onPressed: () => setState(() => _pickingOnMap = false),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -272,11 +476,16 @@ class _RequestServicePageState extends State<RequestServicePage> {
               Expanded(
                 child: Column(
                   children: [
-                    _locationField(_pickupController, 'Enter Pickup Location'),
+                    _locationField(
+                      _pickupController,
+                      'Enter Pickup Location',
+                      _PickTarget.pickup,
+                    ),
                     Divider(height: 1, color: Colors.grey.shade400),
                     _locationField(
                       _dropoffController,
                       'Enter Drop-off Location',
+                      _PickTarget.dropoff,
                     ),
                   ],
                 ),
@@ -285,36 +494,70 @@ class _RequestServicePageState extends State<RequestServicePage> {
           ),
         ),
         const SizedBox(height: 14),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            onPressed: _onSetLocationOnMap,
-            icon: const Icon(
-              Icons.map_outlined,
-              size: 20,
-              color: Colors.black87,
-            ),
-            label: const Text(
-              'Set Location on map',
-              style: TextStyle(color: Colors.black87, fontSize: 12),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: _onSetLocationOnMap,
+              icon: const Icon(
+                Icons.map_outlined,
+                size: 20,
+                color: Colors.black87,
               ),
-              side: BorderSide(color: Colors.grey.shade400),
+              label: const Text(
+                'Set Location on map',
+                style: TextStyle(color: Colors.black87, fontSize: 12),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                side: BorderSide(color: Colors.grey.shade400),
+              ),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(child: _buildRouteSummary()),
+          ],
         ),
       ],
     );
   }
 
-  Widget _locationField(TextEditingController controller, String hint) {
+  Widget _buildRouteSummary() {
+    if (_loadingRoute) {
+      return const Align(
+        alignment: Alignment.centerRight,
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    if (_distanceKm == null || _durationMin == null) {
+      return const SizedBox.shrink();
+    }
+    return Text(
+      '${_distanceKm!.toStringAsFixed(1)} km · $_durationMin min',
+      textAlign: TextAlign.right,
+      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+    );
+  }
+
+  Widget _locationField(
+    TextEditingController controller,
+    String hint,
+    _PickTarget target,
+  ) {
     return TextField(
       controller: controller,
       style: const TextStyle(fontSize: 14),
+      textInputAction: TextInputAction.search,
+      onTap: () => setState(() => _activeField = target),
+      onSubmitted: (text) => _onFieldSubmitted(target, text),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(fontSize: 14, color: Colors.grey.shade600),
@@ -374,13 +617,171 @@ class _RequestServicePageState extends State<RequestServicePage> {
     );
   }
 
-  // ---------------- Actions (hook up later) ----------------
-  void _goToMyLocation() {
-    // TODO: get device location (geolocator) then
-    // _mapController?.animateCamera(CameraUpdate.newLatLng(...));
+  // ---------------- Location helpers ----------------
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<LatLng?> _getCurrentLatLng() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _snack('Please turn on location services');
+        return null;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _snack('Location permission denied');
+        return null;
+      }
+      final pos = await Geolocator.getCurrentPosition();
+      return LatLng(pos.latitude, pos.longitude);
+    } catch (_) {
+      _snack('Could not get your location');
+      return null;
+    }
+  }
+
+  Future<void> _goToMyLocation() async {
+    final here = await _getCurrentLatLng();
+    if (here == null || !mounted) return;
+    _mapController.move(here, 16);
+  }
+
+  /// Runs once the map is ready: prefill pickup with the device location.
+  Future<void> _useCurrentLocationAsPickup() async {
+    if (widget.serviceType != ServiceType.towTruck) return;
+    final here = await _getCurrentLatLng();
+    if (here == null || !mounted) return;
+    _mapController.move(here, 16);
+    await _setPoint(_PickTarget.pickup, here);
+    if (mounted) setState(() => _activeField = _PickTarget.dropoff);
+  }
+
+  /// Stores a point, updates its text field, then refreshes the route.
+  /// If [label] is null the address is looked up from the coordinates.
+  Future<void> _setPoint(
+    _PickTarget target,
+    LatLng point, {
+    String? label,
+  }) async {
+    final controller = target == _PickTarget.pickup
+        ? _pickupController
+        : _dropoffController;
+
+    setState(() {
+      if (target == _PickTarget.pickup) {
+        _pickup = point;
+      } else {
+        _dropoff = point;
+      }
+    });
+
+    if (label != null) {
+      controller.text = label;
+    } else {
+      controller.text =
+          '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+      final address = await _MapApi.reverseGeocode(point);
+      if (!mounted) return;
+      if (address != null) controller.text = address;
+    }
+
+    await _updateRoute();
+  }
+
+  Future<void> _updateRoute() async {
+    final a = _pickup;
+    final b = _dropoff;
+    if (a == null || b == null) return;
+
+    setState(() => _loadingRoute = true);
+    final result = await _MapApi.route(a, b);
+    if (!mounted) return;
+
+    if (result == null) {
+      setState(() {
+        _loadingRoute = false;
+        _routePoints = [];
+        _distanceKm = null;
+        _durationMin = null;
+      });
+      _snack('Could not find a route between these locations');
+      return;
+    }
+
+    setState(() {
+      _loadingRoute = false;
+      _routePoints = result.points;
+      _distanceKm = result.distanceMeters / 1000;
+      _durationMin = (result.durationSeconds / 60).round();
+    });
+
+    // Leave room at the bottom for the sheet.
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: result.points,
+        padding: EdgeInsets.fromLTRB(
+          40,
+          100,
+          40,
+          MediaQuery.of(context).size.height * 0.5,
+        ),
+      ),
+    );
+  }
+
+  // ---------------- Actions ----------------
+  Future<void> _onFieldSubmitted(_PickTarget target, String text) async {
+    final query = text.trim();
+    if (query.isEmpty) return;
+    FocusScope.of(context).unfocus();
+
+    final point = await _MapApi.geocode(query);
+    if (!mounted) return;
+    if (point == null) {
+      _snack('Location not found. Try a more specific address.');
+      return;
+    }
+
+    await _setPoint(target, point, label: query);
+    if (_routePoints.isEmpty && mounted) {
+      _mapController.move(point, 15);
+    }
+  }
+
+  void _onSetLocationOnMap() {
+    FocusScope.of(context).unfocus();
+    setState(() => _pickingOnMap = true);
+  }
+
+  Future<void> _onMapTap(LatLng point) async {
+    if (!_pickingOnMap) return;
+    final target = _activeField;
+    setState(() => _pickingOnMap = false);
+
+    await _setPoint(target, point);
+
+    // After setting pickup, move on to drop-off automatically.
+    if (mounted && target == _PickTarget.pickup && _dropoff == null) {
+      setState(() => _activeField = _PickTarget.dropoff);
+    }
   }
 
   void _onAddCar() {}
-  void _onSetLocationOnMap() {}
-  void _onConfirm() {}
+
+  void _onConfirm() {
+    if (widget.serviceType == ServiceType.towTruck &&
+        (_pickup == null || _dropoff == null)) {
+      _snack('Please set both pickup and drop-off locations');
+      return;
+    }
+    // TODO: create the service request (pickup, dropoff, distance, duration).
+  }
 }
