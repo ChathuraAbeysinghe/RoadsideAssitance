@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -8,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../entities/app_user.dart';
+import '../../entities/vehicle.dart';
 
 class _ServiceConfig {
   final String title;
@@ -23,6 +26,30 @@ class _ServiceConfig {
 
 const String _placeholderIcon = 'assets/images/icon-towtruck.png';
 const String _pickupPinPath = 'assets/images/pickup-point.png';
+
+String _iconAssetFor(VehicleType type) => switch (type) {
+  VehicleType.car => 'assets/images/vehicle-car.png',
+  VehicleType.van => 'assets/images/vehicle-van.png',
+  VehicleType.motorbike => 'assets/images/vehicle-bike.png',
+  VehicleType.threeWheeler => 'assets/images/vehicle-threewheel.png',
+  VehicleType.truck => 'assets/images/vehicle-truck.png',
+  VehicleType.bus => 'assets/images/vehicle-bus.png',
+  VehicleType.towtruck => 'assets/images/vehicle-towtruck.png',
+};
+
+/// Vehicle-type image with a plain icon fallback if the asset is missing.
+Widget _vehicleIcon(VehicleType type, {double size = 24}) {
+  return Image.asset(
+    _iconAssetFor(type),
+    width: size,
+    height: size,
+    fit: BoxFit.contain,
+    errorBuilder: (_, __, ___) => Icon(Icons.directions_car, size: size),
+  );
+}
+
+/// Returned by the vehicle picker when "Add vehicle" is tapped.
+const String _addVehicleResult = 'add_vehicle';
 
 // Replace each iconPath manually later.
 const Map<ServiceType, _ServiceConfig> _serviceConfigs = {
@@ -193,6 +220,10 @@ class _RequestServicePageState extends State<RequestServicePage>
   bool _hasCenteredOnUser = false;
   StreamSubscription<Position>? _positionSub;
   bool _trackingActive = false;
+
+  // Vehicle for this request (user's active vehicle by default)
+  Vehicle? _vehicle;
+  bool _loadingVehicle = true;
   bool _dialogShowing = false;
 
   _ServiceConfig get _config => _serviceConfigs[widget.serviceType]!;
@@ -201,6 +232,7 @@ class _RequestServicePageState extends State<RequestServicePage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadActiveVehicle();
   }
 
   /// When the user comes back from the system settings after turning
@@ -555,24 +587,7 @@ class _RequestServicePageState extends State<RequestServicePage>
   Widget _buildTowingDetails() {
     return Column(
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            onPressed: _onAddCar,
-            icon: const Icon(Icons.add, size: 18, color: Colors.black54),
-            label: const Text(
-              'Add Car',
-              style: TextStyle(color: Colors.black54, fontSize: 14),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-              side: BorderSide(color: Colors.grey.shade300),
-            ),
-          ),
-        ),
+        Align(alignment: Alignment.centerLeft, child: _buildVehicleButton()),
         const SizedBox(height: 18),
         Container(
           padding: const EdgeInsets.all(14),
@@ -662,6 +677,71 @@ class _RequestServicePageState extends State<RequestServicePage>
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildVehicleButton() {
+    final Widget content;
+    if (_loadingVehicle) {
+      content = const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 10),
+          Text(
+            'Loading vehicle…',
+            style: TextStyle(color: Colors.black54, fontSize: 14),
+          ),
+        ],
+      );
+    } else if (_vehicle != null) {
+      content = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _vehicleIcon(_vehicle!.vehicleType, size: 22),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              _vehicle!.displayLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.black87, fontSize: 14),
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.keyboard_arrow_down,
+            size: 18,
+            color: Colors.black54,
+          ),
+        ],
+      );
+    } else {
+      content = const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.add, size: 18, color: Colors.black54),
+          SizedBox(width: 8),
+          Text(
+            'Add Car',
+            style: TextStyle(color: Colors.black54, fontSize: 14),
+          ),
+        ],
+      );
+    }
+
+    return OutlinedButton(
+      onPressed: _loadingVehicle ? null : _onVehicleButtonTap,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+      child: content,
     );
   }
 
@@ -1038,7 +1118,109 @@ class _RequestServicePageState extends State<RequestServicePage>
     }
   }
 
-  void _onAddCar() {}
+  /// Loads the logged-in user's active vehicle (if any) on page load.
+  Future<void> _loadActiveVehicle() async {
+    if (widget.serviceType != ServiceType.towTruck) {
+      _loadingVehicle = false;
+      return;
+    }
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      // NOTE: assumes users are stored in the top-level `users` collection.
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      final data = doc.data();
+      if (data == null) return;
+
+      final user = userFromMap(uid, data);
+      final vehicle = await fetchActiveVehicle(user);
+      if (!mounted) return;
+      setState(() => _vehicle = vehicle);
+    } catch (_) {
+      // Leave the button in its "Add Car" state.
+    } finally {
+      if (mounted) setState(() => _loadingVehicle = false);
+    }
+  }
+
+  /// Tapping the vehicle button lets the user pick another of their vehicles.
+  Future<void> _onVehicleButtonTap() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      _snack('Please log in first');
+      return;
+    }
+
+    List<Vehicle> vehicles;
+    try {
+      vehicles = await fetchVehiclesForUser(uid);
+    } catch (_) {
+      _snack('Could not load your vehicles');
+      return;
+    }
+    if (!mounted) return;
+
+    final picked = await showModalBottomSheet<Object>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            const Text(
+              'Select your vehicle',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final v in vehicles)
+                    ListTile(
+                      leading: _vehicleIcon(v.vehicleType, size: 32),
+                      title: Text('${v.make} ${v.model}'.trim()),
+                      subtitle: Text(v.plateNumber),
+                      trailing: v.id == _vehicle?.id
+                          ? const Icon(Icons.check_circle, color: _brandRed)
+                          : null,
+                      onTap: () => Navigator.of(ctx).pop(v),
+                    ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const CircleAvatar(
+                      radius: 16,
+                      backgroundColor: _brandRed,
+                      child: Icon(Icons.add, size: 20, color: Colors.white),
+                    ),
+                    title: const Text('Add vehicle'),
+                    onTap: () => Navigator.of(ctx).pop(_addVehicleResult),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || picked == null) return;
+    if (picked is Vehicle) {
+      setState(() => _vehicle = picked);
+    } else if (picked == _addVehicleResult) {
+      // TODO: navigate to the add-vehicle page.
+      _snack('Add vehicle page coming soon');
+    }
+  }
 
   void _onConfirm() {
     if (widget.serviceType == ServiceType.towTruck &&
