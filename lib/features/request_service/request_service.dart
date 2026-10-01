@@ -1501,8 +1501,22 @@ class _RequestServicePageState extends State<RequestServicePage>
       );
       return;
     }
-    // TODO: summary pages for the other services.
-    // TODO: create the service request (pickup, dropoff, distance, duration,
-    // vehicle, and for fuel delivery: _liters and _fuelType).
+    if (_isSingleLocation) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RequestSummaryPage(
+            serviceType: widget.serviceType,
+            pickupAddress: _pickupController.text,
+            pickup: _pickup!,
+            vehicle: _isMechanic ? _vehicle : null,
+            liters: _isFuel ? int.parse(_litersController.text) : null,
+            fuelType: _isFuel
+                ? (_fuelType == _FuelType.petrol ? 'Petrol' : 'Diesel')
+                : null,
+          ),
+        ),
+      );
+      return;
+    }
   }
 }

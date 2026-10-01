@@ -10,6 +10,10 @@ const Color _editBlue = Color(0xFF1B7F9E);
 
 const String _truckPinIcon = 'assets/images/icon-towtruck.png';
 const String _cartoonTruck = 'assets/images/cartoon-truck.png';
+const String _cartoonMechanic = 'assets/images/cartoon-mechanic.png';
+const String _cartoonFuel = 'assets/images/cartoon-fuel.png';
+const String _cartoonTire = 'assets/images/cartoon-tire.png';
+const String _cartoonBattery = 'assets/images/cartoon-battery.png';
 const String _noteIcon = 'assets/images/note.png';
 const String _cashIcon = 'assets/images/cash.png';
 const String _cardIcon = 'assets/images/card.png';
@@ -19,16 +23,22 @@ const String _appPackageName = 'com.example.roadside_assitance';
 
 /// Review screen shown after "Confirm" on the request page.
 ///
-/// Only the towing layout is built for now. Other services will get their
-/// own details sections later (see [_buildServiceDetails]).
+/// All five services have a layout (see [_buildServiceDetails]).
 enum _PaymentMethod { cash, card }
 
 class RequestSummaryPage extends StatefulWidget {
   final ServiceType serviceType;
   final String pickupAddress;
-  final String dropoffAddress;
   final LatLng pickup;
-  final LatLng dropoff;
+
+  /// Towing only (null for single-location services).
+  final String? dropoffAddress;
+  final LatLng? dropoff;
+
+  /// Fuel delivery only.
+  final int? liters;
+  final String? fuelType;
+
   final List<LatLng> routePoints;
   final double? distanceKm;
   final int? durationMin;
@@ -38,9 +48,11 @@ class RequestSummaryPage extends StatefulWidget {
     super.key,
     required this.serviceType,
     required this.pickupAddress,
-    required this.dropoffAddress,
     required this.pickup,
-    required this.dropoff,
+    this.dropoffAddress,
+    this.dropoff,
+    this.liters,
+    this.fuelType,
     this.routePoints = const [],
     this.distanceKm,
     this.durationMin,
@@ -53,30 +65,59 @@ class RequestSummaryPage extends StatefulWidget {
 
 class _RequestSummaryPageState extends State<RequestSummaryPage> {
   // PLACEHOLDER pricing: replace with your real fee calculation.
-  static const double _baseFee = 500;
-  static const double _perKm = 150;
+  static const double _baseFee = 500; // towing
+  static const double _perKm = 150; // towing
+  static const double _mechanicFee = 540;
+  static const double _fuelServiceFee = 340;
+  static const double _fuelPricePerLiter = 400; // same for petrol & diesel
+  static const double _flatTireFee = 1530;
+  static const double _batteryFee = 2340;
 
   String _notes = '';
   _PaymentMethod _paymentMethod = _PaymentMethod.cash; // cash is the default
 
-  double get _serviceFee => _baseFee + _perKm * (widget.distanceKm ?? 0);
-  double get _totalAmount => _serviceFee;
+  bool get _isFuel => widget.serviceType == ServiceType.fuelDelivery;
+
+  double get _serviceFee => switch (widget.serviceType) {
+    ServiceType.towTruck => _baseFee + _perKm * (widget.distanceKm ?? 0),
+    ServiceType.mechanic => _mechanicFee,
+    ServiceType.fuelDelivery => _fuelServiceFee,
+    ServiceType.flatTireChange => _flatTireFee,
+    ServiceType.batteryBoost => _batteryFee,
+  };
+
+  double get _fuelCost =>
+      _isFuel ? (widget.liters ?? 0) * _fuelPricePerLiter : 0;
+
+  double get _totalAmount => _serviceFee + _fuelCost;
 
   String _money(double v) => 'Rs: ${v.toStringAsFixed(2)}';
 
-  String get _serviceTitle => switch (widget.serviceType) {
-    ServiceType.towTruck => 'Tow Truck Delivery',
-    ServiceType.mechanic => 'Mechanic Service',
-    ServiceType.batteryBoost => 'Battery Boosting',
-    ServiceType.flatTireChange => 'Flat Tire Change',
-    ServiceType.fuelDelivery => 'Fuel Delivery',
-  };
+  String get _serviceTitle {
+    switch (widget.serviceType) {
+      case ServiceType.towTruck:
+        return 'Tow Truck Delivery';
+      case ServiceType.mechanic:
+        return 'Request a Mechanic';
+      case ServiceType.fuelDelivery:
+        final l = widget.liters ?? 0;
+        return 'Request Fuel ($l ${l == 1 ? 'Liter' : 'Liters'})';
+      case ServiceType.batteryBoost:
+        return 'Battery Boosting';
+      case ServiceType.flatTireChange:
+        return 'Flat Tire';
+    }
+  }
 
   // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      // The keyboard opens over a bottom sheet (which handles its own
+      // insets). Without this, the page and map behind it get re-laid out
+      // on every keyboard animation frame, which causes the lag.
+      resizeToAvoidBottomInset: false,
       body: Column(
         children: [
           Expanded(
@@ -140,16 +181,22 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
   }
 
   Widget _buildMap() {
+    final dropoff = widget.dropoff;
     final fitPoints = widget.routePoints.isNotEmpty
         ? widget.routePoints
-        : [widget.pickup, widget.dropoff];
+        : [widget.pickup, if (dropoff != null) dropoff];
 
     return FlutterMap(
       options: MapOptions(
-        initialCameraFit: CameraFit.coordinates(
-          coordinates: fitPoints,
-          padding: const EdgeInsets.fromLTRB(50, 90, 50, 60),
-        ),
+        // Single-location services just center on the pin.
+        initialCenter: widget.pickup,
+        initialZoom: 16,
+        initialCameraFit: dropoff == null
+            ? null
+            : CameraFit.coordinates(
+                coordinates: fitPoints,
+                padding: const EdgeInsets.fromLTRB(50, 90, 50, 60),
+              ),
         // Read-only preview of the route.
         interactionOptions: const InteractionOptions(
           flags: InteractiveFlag.none,
@@ -187,17 +234,18 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
                 ),
               ),
             ),
-            Marker(
-              point: widget.dropoff,
-              width: 40,
-              height: 40,
-              alignment: Alignment.topCenter,
-              child: const Icon(
-                Icons.location_on,
-                color: Colors.black,
-                size: 40,
+            if (dropoff != null)
+              Marker(
+                point: dropoff,
+                width: 40,
+                height: 40,
+                alignment: Alignment.topCenter,
+                child: const Icon(
+                  Icons.location_on,
+                  color: Colors.black,
+                  size: 40,
+                ),
               ),
-            ),
           ],
         ),
       ],
@@ -264,14 +312,10 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
       case ServiceType.towTruck:
         return _buildTowingSummary();
       case ServiceType.mechanic:
-      case ServiceType.batteryBoost:
-      case ServiceType.flatTireChange:
       case ServiceType.fuelDelivery:
-        // TODO: summary layouts for the other services.
-        return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 24),
-          child: Center(child: Text('Summary for this service is coming soon')),
-        );
+      case ServiceType.flatTireChange:
+      case ServiceType.batteryBoost:
+        return _buildSingleLocationSummary();
     }
   }
 
@@ -280,24 +324,7 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _sectionLabel('Delivery Location'),
-            GestureDetector(
-              // Go back to the request page to change locations.
-              onTap: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Edit',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: _editBlue,
-                ),
-              ),
-            ),
-          ],
-        ),
+        _locationHeader(),
         const SizedBox(height: 10),
         _card(
           padding: const EdgeInsets.all(14),
@@ -330,7 +357,7 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
                   children: [
                     _addressText(widget.pickupAddress),
                     Divider(height: 1, color: Colors.grey.shade400),
-                    _addressText(widget.dropoffAddress),
+                    _addressText(widget.dropoffAddress ?? ''),
                   ],
                 ),
               ),
@@ -340,81 +367,91 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
         const SizedBox(height: 20),
         _sectionLabel('Service Details'),
         const SizedBox(height: 10),
-        _card(
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _serviceTitle,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.vehicle?.displayLabel ?? 'No vehicle selected',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Image.asset(
-                _cartoonTruck,
-                width: 64,
-                height: 52,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) =>
-                    const Icon(Icons.local_shipping, size: 48),
-              ),
-            ],
-          ),
+        _serviceDetailsCard(
+          title: _serviceTitle,
+          subtitle: widget.vehicle?.displayLabel ?? 'No vehicle selected',
+          imagePath: _cartoonTruck,
+          fallbackIcon: Icons.local_shipping,
         ),
         const SizedBox(height: 12),
         _buildNotesButton(),
         const SizedBox(height: 20),
-        _sectionLabel('Payment Details'),
+        ..._paymentSections(),
+      ],
+    );
+  }
+
+  // --- Single-location services (mechanic, fuel, flat tire, battery) ---
+  Widget _buildSingleLocationSummary() {
+    final String subtitle;
+    final String image;
+    final IconData fallback;
+    switch (widget.serviceType) {
+      case ServiceType.fuelDelivery:
+        subtitle = widget.fuelType ?? '';
+        image = _cartoonFuel;
+        fallback = Icons.local_gas_station;
+      case ServiceType.flatTireChange:
+        subtitle = 'Air it up or replace it with your Spare';
+        image = _cartoonTire;
+        fallback = Icons.tire_repair;
+      case ServiceType.batteryBoost:
+        subtitle = 'Jump start';
+        image = _cartoonBattery;
+        fallback = Icons.battery_charging_full;
+      case ServiceType.mechanic:
+      case ServiceType.towTruck:
+        subtitle = 'On-Site Repair';
+        image = _cartoonMechanic;
+        fallback = Icons.build;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _locationHeader(),
         const SizedBox(height: 10),
         _card(
-          child: Column(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
             children: [
-              _paymentRow('Service Fee', _money(_serviceFee), bold: false),
-              const SizedBox(height: 8),
-              _paymentRow('Total Amount', _money(_totalAmount), bold: true),
+              const Icon(Icons.location_on_outlined, size: 24),
+              const SizedBox(width: 16),
+              Expanded(child: _addressText(widget.pickupAddress)),
             ],
           ),
         ),
         const SizedBox(height: 20),
-        _sectionLabel('Payment Method'),
+        _sectionLabel('Service Details'),
         const SizedBox(height: 10),
-        InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: _onPickPaymentMethod,
-          child: _card(
-            child: Row(
-              children: [
-                _methodIcon(_paymentMethod, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _methodLabel(_paymentMethod),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const Icon(Icons.keyboard_arrow_down, color: Colors.black54),
-              ],
+        _serviceDetailsCard(
+          title: _serviceTitle,
+          subtitle: subtitle,
+          imagePath: image,
+          fallbackIcon: fallback,
+        ),
+        const SizedBox(height: 12),
+        _buildNotesButton(),
+        const SizedBox(height: 20),
+        ..._paymentSections(),
+      ],
+    );
+  }
+
+  // ---------------- Shared sections ----------------
+  Widget _locationHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _sectionLabel('Delivery Location'),
+        GestureDetector(
+          // Go back to the request page to change locations.
+          onTap: () => Navigator.of(context).pop(),
+          child: const Text(
+            'Edit',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: _editBlue,
             ),
           ),
         ),
@@ -422,9 +459,98 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
     );
   }
 
+  Widget _serviceDetailsCard({
+    required String title,
+    required String subtitle,
+    required String imagePath,
+    required IconData fallbackIcon,
+  }) {
+    return _card(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Image.asset(
+            imagePath,
+            width: 64,
+            height: 52,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Icon(fallbackIcon, size: 48),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Payment Details + Payment Method sections.
+  List<Widget> _paymentSections() {
+    return [
+      _sectionLabel('Payment Details'),
+      const SizedBox(height: 10),
+      _card(
+        child: Column(
+          children: [
+            _paymentRow('Service Fee', _money(_serviceFee), bold: false),
+            if (_isFuel) ...[
+              const SizedBox(height: 8),
+              _paymentRow('Fuel Cost', _money(_fuelCost), bold: false),
+            ],
+            const SizedBox(height: 8),
+            _paymentRow('Total Amount', _money(_totalAmount), bold: true),
+          ],
+        ),
+      ),
+      const SizedBox(height: 20),
+      _sectionLabel('Payment Method'),
+      const SizedBox(height: 10),
+      InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: _onPickPaymentMethod,
+        child: _card(
+          child: Row(
+            children: [
+              _methodIcon(_paymentMethod, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _methodLabel(_paymentMethod),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const Icon(Icons.keyboard_arrow_down, color: Colors.black54),
+            ],
+          ),
+        ),
+      ),
+    ];
+  }
+
   // ---------------- Pieces ----------------
   String _methodLabel(_PaymentMethod m) => switch (m) {
-    _PaymentMethod.cash => 'Cash on Delivery',
+    _PaymentMethod.cash => 'Cash in Person',
     _PaymentMethod.card => 'Card Payment',
   };
 
@@ -704,25 +830,56 @@ class _NotesSheetState extends State<_NotesSheet> {
               ),
             ),
             const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: () =>
-                    Navigator.of(context).pop(_controller.text.trim()),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _brandRed,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.black87,
+                        side: BorderSide(color: Colors.grey.shade400),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-                child: const Text(
-                  'Save',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: () =>
+                          Navigator.of(context).pop(_controller.text.trim()),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _brandRed,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        'Save',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
