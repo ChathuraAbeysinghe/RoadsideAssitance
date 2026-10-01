@@ -1,9 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../entities/app_user.dart';
+import '../../entities/service_request.dart';
 import '../../entities/vehicle.dart';
+import 'request_searching_page.dart'; // adjust path if needed
 
 const Color _brandRed = Color(0xFFE30613);
 const Color _editBlue = Color(0xFF1B7F9E);
@@ -75,6 +78,7 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
 
   String _notes = '';
   _PaymentMethod _paymentMethod = _PaymentMethod.cash; // cash is the default
+  bool _submitting = false;
 
   bool get _isFuel => widget.serviceType == ServiceType.fuelDelivery;
 
@@ -306,7 +310,7 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
     );
   }
 
-  /// Each service gets its own summary layout here. Towing only for now.
+  /// Each service gets its own summary layout here.
   Widget _buildServiceDetails() {
     switch (widget.serviceType) {
       case ServiceType.towTruck:
@@ -661,19 +665,30 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: _onConfirm,
+        onPressed: _submitting ? null : _onConfirm,
         style: ElevatedButton.styleFrom(
           backgroundColor: _brandRed,
           foregroundColor: Colors.white,
+          disabledBackgroundColor: _brandRed.withValues(alpha: 0.6),
+          disabledForegroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
           ),
         ),
-        child: const Text(
-          'Confirm',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
+        child: _submitting
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Text(
+                'Confirm',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
       ),
     );
   }
@@ -749,14 +764,66 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
     if (result != null && mounted) setState(() => _notes = result);
   }
 
-  void _onConfirm() {
-    // TODO: create the service request (service type, pickup/dropoff,
-    // addresses, vehicle, distance, duration, notes, fee, payment method).
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Request submission coming soon')),
+  /// Creates the request in Firestore, then opens the searching page.
+  Future<void> _onConfirm() async {
+    if (_submitting) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Please sign in again')));
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final dropoff = widget.dropoff;
+      final request = ServiceRequest(
+        customerUid: user.uid,
+        serviceType: widget.serviceType,
+        pickup: GeoLocation(
+          latitude: widget.pickup.latitude,
+          longitude: widget.pickup.longitude,
+        ),
+        pickupAddress: widget.pickupAddress,
+        dropoff: dropoff == null
+            ? null
+            : GeoLocation(
+                latitude: dropoff.latitude,
+                longitude: dropoff.longitude,
+              ),
+        dropoffAddress: widget.dropoffAddress,
+        vehicle: widget.vehicle?.toMap(), // needs Vehicle.toMap()
+        notes: _notes,
+        liters: widget.liters,
+        fuelType: widget.fuelType,
+        distanceKm: widget.distanceKm,
+        durationMin: widget.durationMin,
+        serviceFee: _serviceFee,
+        fuelCost: _fuelCost,
+        totalAmount: _totalAmount,
+        paymentMethod: _paymentMethod.name,
+        searchRadiusKm: kSearchRadiiKm.first,
+        expiresAt: DateTime.now().add(kSearchTimeout),
       );
+
+      final requestId = await createServiceRequest(request);
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              RequestSearchingPage(requestId: requestId, pickup: widget.pickup),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not send the request. Try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 }
 
