@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -52,6 +53,11 @@ Widget _vehicleIcon(VehicleType type, {double size = 24}) {
 /// Returned by the vehicle picker when "Add vehicle" is tapped.
 const String _addVehicleResult = 'add_vehicle';
 
+const int _minLiters = 1;
+const int _maxLiters = 50;
+const String _petrolIconPath = 'assets/images/icon-jerrycan.png';
+const String _dieselIconPath = 'assets/images/gasoline1.png';
+
 // Replace each iconPath manually later.
 const Map<ServiceType, _ServiceConfig> _serviceConfigs = {
   ServiceType.towTruck: _ServiceConfig(
@@ -60,23 +66,23 @@ const Map<ServiceType, _ServiceConfig> _serviceConfigs = {
     iconPath: _placeholderIcon,
   ),
   ServiceType.mechanic: _ServiceConfig(
-    title: 'Request Mechanic',
-    subtitle: 'A mechanic will come to your location',
+    title: 'Request a Mechanic',
+    subtitle: 'Get on-site inspection and roadside repairs',
     iconPath: _placeholderIcon,
   ),
   ServiceType.batteryBoost: _ServiceConfig(
-    title: 'Jump Start',
-    subtitle: 'Get your dead battery started again',
+    title: 'Request Battery Boosting',
+    subtitle: 'Jump-Start',
     iconPath: _placeholderIcon,
   ),
   ServiceType.flatTireChange: _ServiceConfig(
-    title: 'Flat Tire',
-    subtitle: 'Get your flat tire changed on the spot',
+    title: 'Request Flat Tire',
+    subtitle: 'Airing it up or replace it with your spare',
     iconPath: _placeholderIcon,
   ),
   ServiceType.fuelDelivery: _ServiceConfig(
-    title: 'Fuel Delivery',
-    subtitle: 'Fuel delivered to wherever you are stuck',
+    title: 'Request Fuel Delivery',
+    subtitle: 'Get emergency fuel delivered directly to your location',
     iconPath: _placeholderIcon,
   ),
 };
@@ -175,6 +181,8 @@ class _MapApi {
 
 enum _PickTarget { pickup, dropoff }
 
+enum _FuelType { petrol, diesel }
+
 class RequestServicePage extends StatefulWidget {
   final ServiceType serviceType;
   final UserType userType;
@@ -222,6 +230,12 @@ class _RequestServicePageState extends State<RequestServicePage>
   StreamSubscription<Position>? _positionSub;
   bool _trackingActive = false;
 
+  // Fuel delivery options
+  int _liters = 5; // last valid value
+  _FuelType _fuelType = _FuelType.petrol;
+  final _litersController = TextEditingController(text: '5');
+  final _litersFocus = FocusNode();
+
   // Vehicle for this request (user's active vehicle by default)
   Vehicle? _vehicle;
   bool _loadingVehicle = true;
@@ -229,11 +243,34 @@ class _RequestServicePageState extends State<RequestServicePage>
 
   _ServiceConfig get _config => _serviceConfigs[widget.serviceType]!;
 
+  bool get _isTow => widget.serviceType == ServiceType.towTruck;
+  bool get _isMechanic => widget.serviceType == ServiceType.mechanic;
+
+  bool get _isFlatTire => widget.serviceType == ServiceType.flatTireChange;
+  bool get _isBattery => widget.serviceType == ServiceType.batteryBoost;
+
+  bool get _isFuel => widget.serviceType == ServiceType.fuelDelivery;
+
+  /// Services with a single location (no drop-off).
+  bool get _isSingleLocation =>
+      _isMechanic || _isFlatTire || _isBattery || _isFuel;
+
+  /// Services that show the vehicle button.
+  bool get _usesVehicle => _isTow || _isMechanic;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadActiveVehicle();
+    // When the amount field loses focus, restore a valid value if it's
+    // empty or 0.
+    _litersFocus.addListener(() {
+      if (!_litersFocus.hasFocus) {
+        final n = int.tryParse(_litersController.text);
+        if (n == null || n < _minLiters) _setLiters(_liters);
+      }
+    });
   }
 
   /// When the user comes back from the system settings after turning
@@ -253,6 +290,8 @@ class _RequestServicePageState extends State<RequestServicePage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _litersController.dispose();
+    _litersFocus.dispose();
     _positionSub?.cancel();
     _mapController.dispose();
     _pickupController.dispose();
@@ -459,7 +498,9 @@ class _RequestServicePageState extends State<RequestServicePage>
   }
 
   Widget _buildPickingBanner() {
-    final label = _activeField == _PickTarget.pickup ? 'pickup' : 'drop-off';
+    final label = _isSingleLocation
+        ? 'location'
+        : (_activeField == _PickTarget.pickup ? 'pickup' : 'drop-off');
     return SafeArea(
       child: Align(
         alignment: Alignment.topCenter,
@@ -577,10 +618,16 @@ class _RequestServicePageState extends State<RequestServicePage>
       case ServiceType.towTruck:
         return _buildTowingDetails();
       case ServiceType.mechanic:
-      case ServiceType.batteryBoost:
+        return _buildSingleLocationDetails(showVehicle: true);
       case ServiceType.flatTireChange:
+      case ServiceType.batteryBoost:
+        return _buildSingleLocationDetails(showVehicle: false);
       case ServiceType.fuelDelivery:
-        return _buildComingSoon();
+        return _buildSingleLocationDetails(
+          showVehicle: false,
+          hint: 'Enter Delivery Location',
+          header: _buildFuelOptions(),
+        );
     }
   }
 
@@ -676,6 +723,69 @@ class _RequestServicePageState extends State<RequestServicePage>
             const SizedBox(width: 12),
             Expanded(child: _buildRouteSummary()),
           ],
+        ),
+      ],
+    );
+  }
+
+  // ------- Single-location services (mechanic, flat tire, battery) -------
+  Widget _buildSingleLocationDetails({
+    required bool showVehicle,
+    String hint = 'Enter Your Location',
+    Widget? header,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showVehicle) ...[
+          Align(alignment: Alignment.centerLeft, child: _buildVehicleButton()),
+          const SizedBox(height: 18),
+        ],
+        if (header != null) header,
+        const Text(
+          'Location',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade400),
+          ),
+          child: Row(
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _startRepick(_PickTarget.pickup),
+                child: const Icon(Icons.location_on_outlined, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _locationField(
+                  _pickupController,
+                  hint,
+                  _PickTarget.pickup,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        OutlinedButton.icon(
+          onPressed: _onSetLocationOnMap,
+          icon: const Icon(Icons.map_outlined, size: 20, color: Colors.black87),
+          label: const Text(
+            'Set Location on map',
+            style: TextStyle(color: Colors.black87, fontSize: 12),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            side: BorderSide(color: Colors.grey.shade400),
+          ),
         ),
       ],
     );
@@ -787,29 +897,154 @@ class _RequestServicePageState extends State<RequestServicePage>
     );
   }
 
-  Widget _buildComingSoon() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        children: [
-          Image.asset(
-            _config.iconPath,
-            width: 32,
-            height: 32,
-            errorBuilder: (_, __, ___) =>
-                const Icon(Icons.build_outlined, size: 32),
+  // ---------------- Fuel delivery ----------------
+  Widget _buildFuelOptions() {
+    const labelStyle = TextStyle(fontSize: 15, fontWeight: FontWeight.w700);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Fuel Amount', style: labelStyle),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: _pillDecoration(),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 36),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.remove, size: 18),
+                onPressed: _liters > _minLiters
+                    ? () => _setLiters(_liters - 1)
+                    : null,
+              ),
+              const Text(
+                'Liters',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(width: 2),
+              SizedBox(
+                width: 26,
+                child: TextField(
+                  controller: _litersController,
+                  focusNode: _litersFocus,
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(2),
+                  ],
+                  onChanged: _onLitersChanged,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 36),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.add, size: 18),
+                onPressed: _liters < _maxLiters
+                    ? () => _setLiters(_liters + 1)
+                    : null,
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Details for this service are coming soon',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-          ),
-        ],
+        ),
+        const SizedBox(height: 18),
+        const Text('Fuel Type', style: labelStyle),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _fuelChip(_FuelType.petrol, 'Petrol', _petrolIconPath),
+            const SizedBox(width: 12),
+            _fuelChip(_FuelType.diesel, 'Diesel', _dieselIconPath),
+          ],
+        ),
+        const SizedBox(height: 18),
+      ],
+    );
+  }
+
+  void _setLiters(int n) {
+    setState(() => _liters = n);
+    _litersController.value = TextEditingValue(
+      text: '$n',
+      selection: TextSelection.collapsed(offset: '$n'.length),
+    );
+  }
+
+  void _onLitersChanged(String text) {
+    final n = int.tryParse(text);
+    if (n == null) return; // empty while typing
+    if (n > _maxLiters) {
+      _setLiters(_maxLiters);
+      _snack('Maximum is $_maxLiters liters');
+      return;
+    }
+    if (n >= _minLiters) setState(() => _liters = n);
+  }
+
+  BoxDecoration _pillDecoration({Color color = Colors.white}) {
+    return BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(30),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.12),
+          blurRadius: 6,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    );
+  }
+
+  Widget _fuelChip(_FuelType type, String label, String iconPath) {
+    final selected = _fuelType == type;
+    return GestureDetector(
+      onTap: () => setState(() => _fuelType = type),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: _pillDecoration(
+          color: selected ? Colors.black : Colors.white,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Tinted to match the selected / unselected state.
+            Image.asset(
+              iconPath,
+              width: 22,
+              height: 22,
+              fit: BoxFit.contain,
+              color: selected ? Colors.white : Colors.black87,
+              errorBuilder: (_, __, ___) => Icon(
+                Icons.local_gas_station,
+                size: 22,
+                color: selected ? Colors.white : Colors.black87,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : Colors.black87,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -996,9 +1231,12 @@ class _RequestServicePageState extends State<RequestServicePage>
       _hasCenteredOnUser = true;
       _mapController.move(here, 16);
       // Prefill pickup once with the first fix (tow truck only).
-      if (widget.serviceType == ServiceType.towTruck) {
+      if (_isTow || _isSingleLocation) {
         _setPoint(_PickTarget.pickup, here).then((_) {
-          if (mounted) setState(() => _activeField = _PickTarget.dropoff);
+          // Only towing has a drop-off to move on to.
+          if (mounted && _isTow) {
+            setState(() => _activeField = _PickTarget.dropoff);
+          }
         });
       }
     }
@@ -1114,14 +1352,14 @@ class _RequestServicePageState extends State<RequestServicePage>
     await _setPoint(target, point);
 
     // After setting pickup, move on to drop-off automatically.
-    if (mounted && target == _PickTarget.pickup && _dropoff == null) {
+    if (mounted && _isTow && target == _PickTarget.pickup && _dropoff == null) {
       setState(() => _activeField = _PickTarget.dropoff);
     }
   }
 
   /// Loads the logged-in user's active vehicle (if any) on page load.
   Future<void> _loadActiveVehicle() async {
-    if (widget.serviceType != ServiceType.towTruck) {
+    if (!_usesVehicle) {
       _loadingVehicle = false;
       return;
     }
@@ -1227,11 +1465,24 @@ class _RequestServicePageState extends State<RequestServicePage>
   }
 
   void _onConfirm() {
-    if (widget.serviceType == ServiceType.towTruck &&
-        (_pickup == null || _dropoff == null)) {
+    if (_isTow && (_pickup == null || _dropoff == null)) {
       _snack('Please set both pickup and drop-off locations');
       return;
     }
-    // TODO: create the service request (pickup, dropoff, distance, duration).
+    if (_isSingleLocation && _pickup == null) {
+      _snack('Please set your location');
+      return;
+    }
+    if (_isFuel) {
+      final n = int.tryParse(_litersController.text);
+      if (n == null || n < _minLiters || n > _maxLiters) {
+        _snack(
+          'Enter a fuel amount between $_minLiters and $_maxLiters liters',
+        );
+        return;
+      }
+    }
+    // TODO: create the service request (pickup, dropoff, distance, duration,
+    // vehicle, and for fuel delivery: _liters and _fuelType).
   }
 }
