@@ -11,10 +11,15 @@ import '../../entities/service_request.dart';
 
 const Color _brandRed = Color(0xFFE30613);
 
-const String _searchMapImage = 'assets/images/search-map.png';
+const String _searchMapImage = 'assets/images/search-map.jpg';
 const String _searchMagnifierImage = 'assets/images/search-magnifier.png';
 const String _pickupPinPath = 'assets/images/pickup-point.png';
 const String _appPackageName = 'com.example.roadside_assitance';
+
+/// Padding used when fitting the search circle into the visible map.
+/// The map is laid out 30px taller than what's visible (it extends under
+/// the sheet), so the bottom is 30 larger to keep the pin truly centered.
+const EdgeInsets _mapFitPadding = EdgeInsets.fromLTRB(40, 40, 40, 70);
 
 /// Shown after the customer confirms. Listens to the request document:
 ///  - pending  -> searching UI, widening the radius every stage
@@ -35,11 +40,14 @@ class RequestSearchingPage extends StatefulWidget {
 }
 
 class _RequestSearchingPageState extends State<RequestSearchingPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _mapController = MapController();
 
-  /// Drives the map + magnifying glass animation.
+  /// Drives the map + magnifying glass animation in the sheet.
   late final AnimationController _searchAnim;
+
+  /// Drives the radar sweep and pulse rings on the map.
+  late final AnimationController _radarAnim;
 
   StreamSubscription<ServiceRequest?>? _sub;
   Timer? _timer;
@@ -63,6 +71,10 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
       vsync: this,
       duration: const Duration(milliseconds: 2400),
     )..repeat();
+    _radarAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    )..repeat();
     _sub = watchRequest(widget.requestId).listen(_onRequest);
     _startTimer();
   }
@@ -72,6 +84,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     _sub?.cancel();
     _timer?.cancel();
     _searchAnim.dispose();
+    _radarAnim.dispose();
     _elapsedNotifier.dispose();
     _mapController.dispose();
     super.dispose();
@@ -87,7 +100,10 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
         r.providerUid != null) {
       _providerFuture ??= _loadProvider(r.providerUid!);
     }
-    if (r.status != RequestStatus.pending) _timer?.cancel();
+    if (r.status != RequestStatus.pending) {
+      _timer?.cancel();
+      _radarAnim.stop();
+    }
 
     setState(() => _request = r);
   }
@@ -145,7 +161,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     _mapController.fitCamera(
       CameraFit.coordinates(
         coordinates: _radiusExtent(kSearchRadiiKm[_stage]),
-        padding: const EdgeInsets.fromLTRB(30, 90, 30, 320),
+        padding: _mapFitPadding,
       ),
     );
   }
@@ -194,6 +210,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
       setState(() => _stage = 0);
       _fitMapToRadius();
       _startTimer();
+      _radarAnim.repeat();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -279,16 +296,84 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     );
   }
 
+  // ---------------- Radar ----------------
+  /// A pie slice from the pickup point out to [radiusM], between the two
+  /// bearings (degrees).
+  List<LatLng> _sector(double radiusM, double fromDeg, double toDeg) {
+    const distance = Distance();
+    const steps = 10;
+    final points = <LatLng>[widget.pickup];
+    for (var i = 0; i <= steps; i++) {
+      final bearing = fromDeg + (toDeg - fromDeg) * i / steps;
+      points.add(distance.offset(widget.pickup, radiusM, bearing % 360));
+    }
+    return points;
+  }
+
+  /// Rotating sweep with a fading trail, plus two expanding pulse rings.
+  Widget _buildRadarLayers(double radiusM) {
+    return AnimatedBuilder(
+      animation: _radarAnim,
+      builder: (context, _) {
+        final v = _radarAnim.value;
+        final lead = v * 360;
+        const slice = 22.0;
+        const alphas = [0.30, 0.18, 0.09, 0.04];
+
+        final sweeps = <Polygon>[
+          for (var k = 0; k < alphas.length; k++)
+            Polygon(
+              points: _sector(
+                radiusM,
+                lead - slice * (k + 1),
+                lead - slice * k,
+              ),
+              color: _brandRed.withValues(alpha: alphas[k]),
+              borderStrokeWidth: 0,
+            ),
+        ];
+
+        final rings = <CircleMarker>[
+          for (final offset in const [0.0, 0.5])
+            () {
+              final p = (v + offset) % 1;
+              return CircleMarker(
+                point: widget.pickup,
+                radius: radiusM * p,
+                useRadiusInMeter: true,
+                color: Colors.transparent,
+                borderColor: const Color.fromARGB(
+                  255,
+                  255,
+                  221,
+                  0,
+                ).withValues(alpha: 0.45 * (1 - p)),
+                borderStrokeWidth: 2,
+              );
+            }(),
+        ];
+
+        return Stack(
+          children: [
+            PolygonLayer(polygons: sweeps),
+            CircleLayer(circles: rings),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildMap() {
     final radiusKm = kSearchRadiiKm[_stage];
+    final searching = _status == RequestStatus.pending;
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
         initialCenter: widget.pickup,
-        initialZoom: 12,
+        initialZoom: 13,
         initialCameraFit: CameraFit.coordinates(
           coordinates: _radiusExtent(kSearchRadiiKm.first),
-          padding: const EdgeInsets.fromLTRB(30, 90, 30, 320),
+          padding: _mapFitPadding,
         ),
         interactionOptions: const InteractionOptions(
           flags: InteractiveFlag.none,
@@ -306,12 +391,24 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
               point: widget.pickup,
               radius: radiusKm * 1000,
               useRadiusInMeter: true,
-              color: _brandRed.withValues(alpha: 0.08),
-              borderColor: _brandRed.withValues(alpha: 0.4),
+              color: const Color.fromARGB(
+                255,
+                253,
+                144,
+                1,
+              ).withValues(alpha: 0.08),
+              borderColor: const Color.fromARGB(
+                255,
+                255,
+                0,
+                0,
+              ).withValues(alpha: 0.4),
               borderStrokeWidth: 1.5,
             ),
           ],
         ),
+        // Radar animation (only while searching).
+        if (searching) _buildRadarLayers(radiusKm * 1000),
         MarkerLayer(
           markers: [
             Marker(
@@ -458,15 +555,20 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
             children: [
               Transform.scale(
                 scale: pulse,
-                child: Image.asset(
-                  _searchMapImage,
-                  width: size,
-                  height: size,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Icon(
-                    Icons.map,
-                    size: size * 0.8,
-                    color: Colors.green.shade300,
+                // Rounded corners since the map image is a .jpg
+                // (no transparency).
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    _searchMapImage,
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.map,
+                      size: size * 0.8,
+                      color: Colors.green.shade300,
+                    ),
                   ),
                 ),
               ),
