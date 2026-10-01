@@ -94,11 +94,7 @@ class _AuthenticatedRoute extends StatelessWidget {
   Widget _buildRoleHome(AppUser user) {
     switch (user.userType) {
       case UserType.driver:
-        return HomePage(
-          userType: user.userType,
-          userName: user.name,
-          profileImagePath: user.profileImagePath,
-        );
+        return HomePage(userType: user.userType);
       case UserType.assistanceProvider:
         return ProviderHomePage(
           userType: user.userType,

@@ -65,11 +65,7 @@ void _goToRoleHome(BuildContext context, AppUser user) {
 
   switch (user.userType) {
     case UserType.driver:
-      destination = HomePage(
-        userType: user.userType,
-        userName: user.name,
-        profileImagePath: user.profileImagePath,
-      );
+      destination = HomePage(userType: user.userType);
       break;
     case UserType.assistanceProvider:
       final provider = user as AssistanceProvider;

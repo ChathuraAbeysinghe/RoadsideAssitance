@@ -12,12 +12,14 @@ import '../../vehicles/vehicle_list_page.dart';
 /// construct these; see [AppBottomNavBar._tabs].
 class _NavTab {
   final String label;
-  final String iconAssetPath;
+  final String inactiveIconAssetPath;
+  final String activeIconAssetPath;
   final WidgetBuilder destinationBuilder;
 
   const _NavTab({
     required this.label,
-    required this.iconAssetPath,
+    required this.inactiveIconAssetPath,
+    required this.activeIconAssetPath,
     required this.destinationBuilder,
   });
 }
@@ -62,30 +64,30 @@ class AppBottomNavBar extends StatelessWidget {
   List<_NavTab> get _tabs => [
     _NavTab(
       label: 'Home',
-      iconAssetPath: 'assets/images/home2.png',
+      inactiveIconAssetPath: 'assets/images/home1.png',
+      activeIconAssetPath: 'assets/images/home2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
           : const ProviderHomePage(userType: UserType.assistanceProvider),
     ),
     _NavTab(
       label: userType == UserType.driver ? 'Requests' : 'Job',
-      iconAssetPath: 'assets/images/clipboard1.png',
+      inactiveIconAssetPath: 'assets/images/clipboard1.png',
+      activeIconAssetPath: 'assets/images/clipboard2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
           : const ProviderHomePage(userType: UserType.assistanceProvider),
     ),
     _NavTab(
-      label: userType == UserType.driver ? 'Vehicle' : 'Services',
-      iconAssetPath: userType == UserType.driver
-          ? 'assets/images/wheel1.png'
-          : 'assets/images/clipboard1.png',
-      destinationBuilder: (_) => userType == UserType.driver
-          ? VehicleListPage(uid: _uid)
-          : ProviderServicesPage(uid: _uid),
+      label: 'Vehicle',
+      inactiveIconAssetPath: 'assets/images/wheel1.png',
+      activeIconAssetPath: 'assets/images/wheel2.png',
+      destinationBuilder: (_) => VehicleListPage(uid: _uid),
     ),
     _NavTab(
       label: 'More',
-      iconAssetPath: 'assets/images/application1.png',
+      inactiveIconAssetPath: 'assets/images/application1.png',
+      activeIconAssetPath: 'assets/images/application2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
           : const ProviderProfilePage(),
@@ -161,13 +163,9 @@ class _NavItem extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Image.asset(
-            tab.iconAssetPath,
+            isActive ? tab.activeIconAssetPath : tab.inactiveIconAssetPath,
             height: 24,
             width: 24,
-            // Matches the driver HomePage's original behavior: the
-            // active tab shows the asset's own colors (no tint),
-            // inactive tabs are tinted grey.
-            color: isActive ? null : Colors.grey.shade600,
             errorBuilder: (context, error, stackTrace) =>
                 Icon(Icons.circle_outlined, size: 24, color: color),
           ),

@@ -1,27 +1,26 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../entities/app_user.dart';
 import '../_share/navbar/app_bottom_nav_bar.dart';
+import '../request_service/request_service.dart';
 
 class HomePage extends StatefulWidget {
   final UserType userType;
-  final String userName;
-  final String profileImagePath;
 
-  const HomePage({
-    super.key,
-    this.userType = UserType.driver,
-    this.userName = 'Driver',
-    this.profileImagePath = '',
-  });
+  const HomePage({super.key, this.userType = UserType.driver});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+  // Set to false if hero.png already contains the "24/7 Roadside Assistance" text.
+  static const bool _showHeroText = true;
+
   // Add / remove image paths here — the carousel adapts to however many you put.
   final List<String> _heroImages = const [
     'assets/images/fuelstation.jpg',
@@ -29,21 +28,36 @@ class _HomePageState extends State<HomePage> {
   ];
 
   late final PageController _heroController;
+  late final Future<AppUser?> _userFuture;
   Timer? _heroTimer;
   int _currentHeroPage = 0;
 
   String get _greeting {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning!';
-    if (hour < 17) return 'Good Afternoon!';
-    return 'Good Evening!';
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
   }
 
   @override
   void initState() {
     super.initState();
+    _userFuture = _loadCurrentUser();
     _heroController = PageController(initialPage: 0);
     _startHeroTimer();
+  }
+
+  Future<AppUser?> _loadCurrentUser() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+
+    final document = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+    final data = document.data();
+    if (!document.exists || data == null) return null;
+    return userFromMap(uid, data);
   }
 
   void _startHeroTimer() {
@@ -59,6 +73,15 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  void _openService(ServiceType type) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            RequestServicePage(serviceType: type, userType: widget.userType),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _heroTimer?.cancel();
@@ -66,86 +89,184 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.centerRight,
-            colors: [
-              Color.fromARGB(255, 255, 195, 66),
-              Color.fromARGB(255, 255, 240, 153),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
+  Widget _buildHeader() {
+    return FutureBuilder<AppUser?>(
+      future: _userFuture,
+      builder: (context, snapshot) {
+        final appUser = snapshot.data;
+        final userName = appUser?.name.trim().isNotEmpty == true
+            ? appUser!.name
+            : 'Driver';
+        final profileImagePath = appUser?.profileImagePath ?? '';
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
             children: [
-              // Fixed header and search bar
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color.fromARGB(0, 212, 211, 211),
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: widget.profileImagePath.isEmpty
-                            ? Image.asset(
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color.fromARGB(255, 196, 196, 196),
+                  ),
+                ),
+                child: ClipOval(
+                  child: profileImagePath.isEmpty
+                      ? Image.asset(
+                          'assets/images/profile.png',
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                        )
+                      : Image.network(
+                          profileImagePath,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Image.asset(
                                 'assets/images/profile.png',
                                 width: 48,
                                 height: 48,
                                 fit: BoxFit.cover,
-                              )
-                            : Image.network(
-                                widget.profileImagePath,
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Image.asset(
-                                      'assets/images/profile.png',
-                                      width: 48,
-                                      height: 48,
-                                      fit: BoxFit.cover,
-                                    ),
                               ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'Hi ${widget.userName},\n$_greeting',
-                          style: const TextStyle(
-                            fontSize: 15,
-
-                            fontWeight: FontWeight.w500,
-                            height: 1.3,
-                            color: Color.fromARGB(255, 0, 0, 0),
-                          ),
                         ),
-                      ),
-                    ),
-                    Icon(
-                      Icons.notifications_none,
-                      size: 26,
-                      color: Colors.black87,
-                    ),
-                  ],
                 ),
               ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _greeting,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        userName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.notifications_none,
+                size: 26,
+                color: Colors.black87,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeroTextOverlay() {
+    const shadows = [
+      Shadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1)),
+    ];
+    return const Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        // Lower this number to push the text further down, raise it to move it up.
+        padding: EdgeInsets.only(bottom: 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '24/7 Roadside Assistance',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                shadows: shadows,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Anywhere Across the Island',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                shadows: shadows,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
+    const headerContentHeight = 72.0; // avatar row area
+    const heroTextAreaHeight = 120.0; // visible hero height above white card
+    const heroOverlap = 50.0; // hero image extends behind the card corners
+    const heroRaise = 20.0; // how much higher the hero image starts
+
+    final headerHeight = topInset + headerContentHeight;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          // Hero image (red banner) starts higher (behind the header row)
+          // and extends behind the rounded top of the white card.
+          Positioned(
+            top: headerHeight - heroRaise,
+            left: 0,
+            right: 0,
+            height: heroTextAreaHeight + heroOverlap + heroRaise,
+            child: Image.asset(
+              'assets/images/hero.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              errorBuilder: (context, error, stackTrace) =>
+                  Container(color: const Color(0xFFE30613)),
+            ),
+          ),
+
+          Column(
+            children: [
+              // Header (avatar, greeting, bell)
+              SizedBox(
+                height: headerHeight,
+                child: Padding(
+                  padding: EdgeInsets.only(top: topInset),
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: _buildHeader(),
+                  ),
+                ),
+              ),
+
+              // Hero title text area
+              SizedBox(
+                height: heroTextAreaHeight,
+                width: double.infinity,
+                child: _showHeroText ? _buildHeroTextOverlay() : null,
+              ),
+
+              // White rounded content card
               Expanded(
                 child: Container(
                   clipBehavior: Clip.antiAlias,
@@ -169,9 +290,8 @@ class _HomePageState extends State<HomePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 5),
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                              padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
                               child: Container(
                                 height: 52,
                                 padding: const EdgeInsets.symmetric(
@@ -191,7 +311,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     const SizedBox(width: 10),
                                     Text(
-                                      'What service do you need?',
+                                      'What service do you need ?',
                                       style: TextStyle(
                                         fontSize: 15,
                                         color: Colors.grey.shade500,
@@ -219,6 +339,9 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Vehicle Tow',
                                           imagePath: 'assets/images/towing.png',
                                           height: 110,
+                                          onTap: () => _openService(
+                                            ServiceType.towTruck,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 14),
@@ -228,6 +351,9 @@ class _HomePageState extends State<HomePage> {
                                           imagePath:
                                               'assets/images/mechanic.png',
                                           height: 110,
+                                          onTap: () => _openService(
+                                            ServiceType.mechanic,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -239,10 +365,13 @@ class _HomePageState extends State<HomePage> {
                                     children: [
                                       Expanded(
                                         child: _ServiceItem(
-                                          label: 'Request Fuel',
+                                          label: 'Jump Start',
                                           imagePath:
-                                              'assets/images/outoffuel.png',
+                                              'assets/images/jumpstart.png',
                                           height: 60,
+                                          onTap: () => _openService(
+                                            ServiceType.batteryBoost,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 10),
@@ -252,15 +381,21 @@ class _HomePageState extends State<HomePage> {
                                           imagePath:
                                               'assets/images/flattire.png',
                                           height: 60,
+                                          onTap: () => _openService(
+                                            ServiceType.flatTireChange,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: _ServiceItem(
-                                          label: 'Jump Start',
+                                          label: 'Fuel Delivery',
                                           imagePath:
-                                              'assets/images/jumpstart.png',
+                                              'assets/images/outoffuel.png',
                                           height: 60,
+                                          onTap: () => _openService(
+                                            ServiceType.fuelDelivery,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -269,17 +404,16 @@ class _HomePageState extends State<HomePage> {
                                 ],
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(20, 0, 20, 0),
                               child: SizedBox(
                                 width: double.infinity,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: const [
+                                  children: [
                                     SizedBox(height: 6),
-
                                     Text(
-                                      'Explore Other Services',
+                                      'Explore Nearby',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 18,
@@ -291,7 +425,8 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            // Auto-rotating hero carousel (changes image every 5 seconds).
+
+                            // Auto-rotating carousel
                             Padding(
                               padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                               child: Container(
@@ -342,10 +477,6 @@ class _HomePageState extends State<HomePage> {
                       ),
 
                       // Bottom navigation bar overlays the scrollable content.
-                      // Home is tab index 0. All four tabs, icons, and
-                      // destinations (plus the signed-in user's uid) are
-                      // handled inside the nav bar itself — nothing to wire
-                      // up here.
                       Align(
                         alignment: Alignment.bottomCenter,
                         child: AppBottomNavBar(
@@ -359,7 +490,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -369,55 +500,61 @@ class _ServiceItem extends StatelessWidget {
   final String label;
   final String imagePath;
   final double height;
+  final VoidCallback onTap;
 
   const _ServiceItem({
     required this.label,
     required this.imagePath,
     required this.height,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Image.asset(
-              imagePath,
-              height: height,
-              width: double.infinity,
-              fit: BoxFit.fitWidth,
-              errorBuilder: (context, error, stackTrace) => Container(
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Image.asset(
+                imagePath,
                 height: height,
                 width: double.infinity,
-                color: Colors.grey.shade300,
-                child: const Icon(
-                  Icons.image_not_supported_outlined,
-                  color: Colors.grey,
+                fit: BoxFit.fitWidth,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: height,
+                  width: double.infinity,
+                  color: Colors.grey.shade300,
+                  child: const Icon(
+                    Icons.image_not_supported_outlined,
+                    color: Colors.grey,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
       ),
     );
   }
