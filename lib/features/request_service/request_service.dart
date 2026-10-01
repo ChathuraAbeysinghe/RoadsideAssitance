@@ -161,7 +161,8 @@ class RequestServicePage extends StatefulWidget {
   State<RequestServicePage> createState() => _RequestServicePageState();
 }
 
-class _RequestServicePageState extends State<RequestServicePage> {
+class _RequestServicePageState extends State<RequestServicePage>
+    with WidgetsBindingObserver {
   static const Color _brandRed = Color(0xFFE30613);
 
   // How far the map extends under the sheet so its rounded corners
@@ -191,11 +192,34 @@ class _RequestServicePageState extends State<RequestServicePage> {
   bool _locatingUser = true;
   bool _hasCenteredOnUser = false;
   StreamSubscription<Position>? _positionSub;
+  bool _trackingActive = false;
+  bool _dialogShowing = false;
 
   _ServiceConfig get _config => _serviceConfigs[widget.serviceType]!;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// When the user comes back from the system settings after turning
+  /// location on, start tracking automatically.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
+    if (state != AppLifecycleState.resumed) return;
+    if (_trackingActive || _userLocation != null) return;
+    if (!await Geolocator.isLocationServiceEnabled()) return;
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.deniedForever) return;
+    if (!mounted) return;
+    setState(() => _locatingUser = true);
+    _startLocationTracking();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _positionSub?.cancel();
     _mapController.dispose();
     _pickupController.dispose();
@@ -288,7 +312,7 @@ class _RequestServicePageState extends State<RequestServicePage> {
           userAgentPackageName: _appPackageName,
         ),
         // GPS accuracy circle
-        if (_userLocation != null && _userAccuracy > 0)
+        if (_pickingOnMap && _userLocation != null && _userAccuracy > 0)
           CircleLayer(
             circles: [
               CircleMarker(
@@ -315,8 +339,9 @@ class _RequestServicePageState extends State<RequestServicePage> {
         MarkerLayer(
           rotate: true,
           markers: [
-            // Live user location (blue dot), drawn first so pins sit on top.
-            if (_userLocation != null)
+            // Live user location (blue dot), only shown while picking on the
+            // map. Drawn first so pins sit on top.
+            if (_pickingOnMap && _userLocation != null)
               Marker(
                 point: _userLocation!,
                 width: 22,
@@ -739,17 +764,66 @@ class _RequestServicePageState extends State<RequestServicePage> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _showLocationAlert({
+    required String title,
+    required String message,
+    required String actionLabel,
+    required Future<void> Function() onAction,
+  }) async {
+    if (!mounted || _dialogShowing) return;
+    _dialogShowing = true;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              onAction();
+            },
+            child: Text(actionLabel, style: const TextStyle(color: _brandRed)),
+          ),
+        ],
+      ),
+    );
+    _dialogShowing = false;
+  }
+
   Future<bool> _ensureLocationPermission() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
-      _snack('Please turn on location services');
+      await _showLocationAlert(
+        title: 'Location is turned off',
+        message:
+            'Please turn on location services so we can find where you are.',
+        actionLabel: 'Turn On',
+        onAction: () async {
+          await Geolocator.openLocationSettings();
+        },
+      );
       return false;
     }
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.deniedForever) {
+      await _showLocationAlert(
+        title: 'Location permission needed',
+        message: 'Location access is blocked for this app. Enable it in the app settings.',
+        actionLabel: 'Open Settings',
+        onAction: () async {
+          await Geolocator.openAppSettings();
+        },
+      );
+      return false;
+    }
+    if (permission == LocationPermission.denied) {
       _snack('Location permission denied');
       return false;
     }
@@ -775,8 +849,11 @@ class _RequestServicePageState extends State<RequestServicePage> {
 
   /// Runs once the map is ready: gets a first fix, then streams live updates.
   Future<void> _startLocationTracking() async {
+    if (_trackingActive) return;
+    _trackingActive = true;
     try {
       if (!await _ensureLocationPermission()) {
+        _trackingActive = false;
         if (mounted) setState(() => _locatingUser = false);
         return;
       }
@@ -818,6 +895,7 @@ class _RequestServicePageState extends State<RequestServicePage> {
         }
       });
     } catch (_) {
+      _trackingActive = false;
       if (mounted) setState(() => _locatingUser = false);
     }
   }
