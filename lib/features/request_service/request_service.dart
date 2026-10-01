@@ -11,6 +11,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../entities/app_user.dart';
 import '../../entities/vehicle.dart';
+import '../vehicles/add_vehicle_page.dart';
 
 class _ServiceConfig {
   final String title;
@@ -727,7 +728,7 @@ class _RequestServicePageState extends State<RequestServicePage>
           Icon(Icons.add, size: 18, color: Colors.black54),
           SizedBox(width: 8),
           Text(
-            'Add Car',
+            'Add vehicle',
             style: TextStyle(color: Colors.black54, fontSize: 14),
           ),
         ],
@@ -1217,8 +1218,11 @@ class _RequestServicePageState extends State<RequestServicePage>
     if (picked is Vehicle) {
       setState(() => _vehicle = picked);
     } else if (picked == _addVehicleResult) {
-      // TODO: navigate to the add-vehicle page.
-      _snack('Add vehicle page coming soon');
+      final added = await Navigator.of(context).push<Vehicle>(
+        MaterialPageRoute(builder: (_) => AddVehiclePage(ownerUid: uid)),
+      );
+      // AddVehiclePage pops with the saved Vehicle on Confirm.
+      if (added != null && mounted) setState(() => _vehicle = added);
     }
   }
 
