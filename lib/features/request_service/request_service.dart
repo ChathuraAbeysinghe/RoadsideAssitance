@@ -65,13 +65,13 @@ const Map<ServiceType, _ServiceConfig> _serviceConfigs = {
     iconPath: _placeholderIcon,
   ),
   ServiceType.batteryBoost: _ServiceConfig(
-    title: 'Jump Start',
-    subtitle: 'Get your dead battery started again',
+    title: 'Request Battery Boosting',
+    subtitle: 'Jump-Start',
     iconPath: _placeholderIcon,
   ),
   ServiceType.flatTireChange: _ServiceConfig(
-    title: 'Flat Tire',
-    subtitle: 'Get your flat tire changed on the spot',
+    title: 'Request Flat Tire',
+    subtitle: 'Airing it up or replace it with your spare',
     iconPath: _placeholderIcon,
   ),
   ServiceType.fuelDelivery: _ServiceConfig(
@@ -232,7 +232,13 @@ class _RequestServicePageState extends State<RequestServicePage>
   bool get _isTow => widget.serviceType == ServiceType.towTruck;
   bool get _isMechanic => widget.serviceType == ServiceType.mechanic;
 
-  /// Services that use the vehicle button and prefill location from GPS.
+  bool get _isFlatTire => widget.serviceType == ServiceType.flatTireChange;
+  bool get _isBattery => widget.serviceType == ServiceType.batteryBoost;
+
+  /// Services with a single location (no drop-off).
+  bool get _isSingleLocation => _isMechanic || _isFlatTire || _isBattery;
+
+  /// Services that show the vehicle button.
   bool get _usesVehicle => _isTow || _isMechanic;
 
   @override
@@ -465,7 +471,7 @@ class _RequestServicePageState extends State<RequestServicePage>
   }
 
   Widget _buildPickingBanner() {
-    final label = _isMechanic
+    final label = _isSingleLocation
         ? 'location'
         : (_activeField == _PickTarget.pickup ? 'pickup' : 'drop-off');
     return SafeArea(
@@ -585,9 +591,10 @@ class _RequestServicePageState extends State<RequestServicePage>
       case ServiceType.towTruck:
         return _buildTowingDetails();
       case ServiceType.mechanic:
-        return _buildMechanicDetails();
-      case ServiceType.batteryBoost:
+        return _buildSingleLocationDetails(showVehicle: true);
       case ServiceType.flatTireChange:
+      case ServiceType.batteryBoost:
+        return _buildSingleLocationDetails(showVehicle: false);
       case ServiceType.fuelDelivery:
         return _buildComingSoon();
     }
@@ -690,13 +697,15 @@ class _RequestServicePageState extends State<RequestServicePage>
     );
   }
 
-  // ---------------- Mechanic ----------------
-  Widget _buildMechanicDetails() {
+  // ------- Single-location services (mechanic, flat tire, battery) -------
+  Widget _buildSingleLocationDetails({required bool showVehicle}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Align(alignment: Alignment.centerLeft, child: _buildVehicleButton()),
-        const SizedBox(height: 18),
+        if (showVehicle) ...[
+          Align(alignment: Alignment.centerLeft, child: _buildVehicleButton()),
+          const SizedBox(height: 18),
+        ],
         const Text(
           'Location',
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
@@ -1061,7 +1070,7 @@ class _RequestServicePageState extends State<RequestServicePage>
       _hasCenteredOnUser = true;
       _mapController.move(here, 16);
       // Prefill pickup once with the first fix (tow truck only).
-      if (_usesVehicle) {
+      if (_isTow || _isSingleLocation) {
         _setPoint(_PickTarget.pickup, here).then((_) {
           // Only towing has a drop-off to move on to.
           if (mounted && _isTow) {
@@ -1299,7 +1308,7 @@ class _RequestServicePageState extends State<RequestServicePage>
       _snack('Please set both pickup and drop-off locations');
       return;
     }
-    if (_isMechanic && _pickup == null) {
+    if (_isSingleLocation && _pickup == null) {
       _snack('Please set your location');
       return;
     }
