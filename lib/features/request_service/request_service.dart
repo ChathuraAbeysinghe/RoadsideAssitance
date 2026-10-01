@@ -13,6 +13,7 @@ import 'package:latlong2/latlong.dart';
 import '../../entities/app_user.dart';
 import '../../entities/vehicle.dart';
 import '../vehicles/add_vehicle_page.dart';
+import 'request_summary_page.dart';
 
 class _ServiceConfig {
   final String title;
@@ -1482,7 +1483,40 @@ class _RequestServicePageState extends State<RequestServicePage>
         return;
       }
     }
-    // TODO: create the service request (pickup, dropoff, distance, duration,
-    // vehicle, and for fuel delivery: _liters and _fuelType).
+    if (_isTow) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RequestSummaryPage(
+            serviceType: widget.serviceType,
+            pickupAddress: _pickupController.text,
+            dropoffAddress: _dropoffController.text,
+            pickup: _pickup!,
+            dropoff: _dropoff!,
+            routePoints: _routePoints,
+            distanceKm: _distanceKm,
+            durationMin: _durationMin,
+            vehicle: _vehicle,
+          ),
+        ),
+      );
+      return;
+    }
+    if (_isSingleLocation) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RequestSummaryPage(
+            serviceType: widget.serviceType,
+            pickupAddress: _pickupController.text,
+            pickup: _pickup!,
+            vehicle: _isMechanic ? _vehicle : null,
+            liters: _isFuel ? int.parse(_litersController.text) : null,
+            fuelType: _isFuel
+                ? (_fuelType == _FuelType.petrol ? 'Petrol' : 'Diesel')
+                : null,
+          ),
+        ),
+      );
+      return;
+    }
   }
 }
