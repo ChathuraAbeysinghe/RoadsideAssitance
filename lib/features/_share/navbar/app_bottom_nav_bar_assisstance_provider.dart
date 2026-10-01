@@ -2,7 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../vehicles/vehicle_list_page.dart';
-import '../../home/assistance_provider_home_page.dart';
+import '../../service_provider/screens/provider_home_page.dart';
+import '../../service_provider/screens/provider_profile_page.dart';
 
 /// One tab in [AppBottomNavBarAssisstanceProvider]. Fully internal now —
 /// hosting pages never construct these; see [AppBottomNavBarAssisstanceProvider._tabs].
@@ -62,12 +63,12 @@ class AppBottomNavBarAssisstanceProvider extends StatelessWidget {
     _NavTab(
       label: 'Home',
       iconAssetPath: 'assets/images/home2.png',
-      destinationBuilder: (_) => const AssistanceProviderHomePage(),
+      destinationBuilder: (_) => const ProviderHomePage(),
     ),
     _NavTab(
       label: 'Job',
       iconAssetPath: 'assets/images/clipboard1.png',
-      destinationBuilder: (_) => const AssistanceProviderHomePage(), // TEMP
+      destinationBuilder: (_) => const ProviderHomePage(),
     ),
     _NavTab(
       label: 'Vehicle',
@@ -77,7 +78,7 @@ class AppBottomNavBarAssisstanceProvider extends StatelessWidget {
     _NavTab(
       label: 'More',
       iconAssetPath: 'assets/images/application1.png',
-      destinationBuilder: (_) => const AssistanceProviderHomePage(), // TEMP
+      destinationBuilder: (_) => const ProviderProfilePage(),
     ),
   ];
 

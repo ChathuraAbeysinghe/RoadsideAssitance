@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../../../entities/app_user.dart';
 import '../../home/home_page.dart';
-import '../../home/assistance_provider_home_page.dart';
+import '../../service_provider/screens/provider_home_page.dart';
+import '../../service_provider/screens/provider_profile_page.dart';
+import '../../service_provider/screens/provider_services_page.dart';
 import '../../vehicles/vehicle_list_page.dart';
 
 /// One tab in [AppBottomNavBar]. Fully internal now — hosting pages never
@@ -66,9 +68,7 @@ class AppBottomNavBar extends StatelessWidget {
       activeIconAssetPath: 'assets/images/home2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
-          : const AssistanceProviderHomePage(
-              userType: UserType.assistanceProvider,
-            ),
+          : const ProviderHomePage(userType: UserType.assistanceProvider),
     ),
     _NavTab(
       label: userType == UserType.driver ? 'Requests' : 'Job',
@@ -76,9 +76,7 @@ class AppBottomNavBar extends StatelessWidget {
       activeIconAssetPath: 'assets/images/clipboard2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
-          : const AssistanceProviderHomePage(
-              userType: UserType.assistanceProvider,
-            ),
+          : const ProviderHomePage(userType: UserType.assistanceProvider),
     ),
     _NavTab(
       label: 'Vehicle',
@@ -92,9 +90,7 @@ class AppBottomNavBar extends StatelessWidget {
       activeIconAssetPath: 'assets/images/application2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
-          : const AssistanceProviderHomePage(
-              userType: UserType.assistanceProvider,
-            ),
+          : const ProviderProfilePage(),
     ),
   ];
 
