@@ -12,6 +12,7 @@ const String _truckPinIcon = 'assets/images/icon-towtruck.png';
 const String _cartoonTruck = 'assets/images/cartoon-truck.png';
 const String _noteIcon = 'assets/images/note.png';
 const String _cashIcon = 'assets/images/cash.png';
+const String _cardIcon = 'assets/images/card.png';
 const String _pickupPinPath = 'assets/images/pickup-point.png';
 
 const String _appPackageName = 'com.example.roadside_assitance';
@@ -20,6 +21,8 @@ const String _appPackageName = 'com.example.roadside_assitance';
 ///
 /// Only the towing layout is built for now. Other services will get their
 /// own details sections later (see [_buildServiceDetails]).
+enum _PaymentMethod { cash, card }
+
 class RequestSummaryPage extends StatefulWidget {
   final ServiceType serviceType;
   final String pickupAddress;
@@ -54,6 +57,7 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
   static const double _perKm = 150;
 
   String _notes = '';
+  _PaymentMethod _paymentMethod = _PaymentMethod.cash; // cash is the default
 
   double get _serviceFee => _baseFee + _perKm * (widget.distanceKm ?? 0);
   double get _totalAmount => _serviceFee;
@@ -392,23 +396,26 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
         const SizedBox(height: 20),
         _sectionLabel('Payment Method'),
         const SizedBox(height: 10),
-        _card(
-          child: Row(
-            children: [
-              Image.asset(
-                _cashIcon,
-                width: 28,
-                height: 28,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) =>
-                    const Icon(Icons.payments_outlined, size: 28),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Cash on Delivery',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-            ],
+        InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: _onPickPaymentMethod,
+          child: _card(
+            child: Row(
+              children: [
+                _methodIcon(_paymentMethod, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _methodLabel(_paymentMethod),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.keyboard_arrow_down, color: Colors.black54),
+              ],
+            ),
           ),
         ),
       ],
@@ -416,6 +423,25 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
   }
 
   // ---------------- Pieces ----------------
+  String _methodLabel(_PaymentMethod m) => switch (m) {
+    _PaymentMethod.cash => 'Cash on Delivery',
+    _PaymentMethod.card => 'Card Payment',
+  };
+
+  Widget _methodIcon(_PaymentMethod m, {double size = 28}) {
+    final isCash = m == _PaymentMethod.cash;
+    return Image.asset(
+      isCash ? _cashIcon : _cardIcon,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => Icon(
+        isCash ? Icons.payments_outlined : Icons.credit_card,
+        size: size,
+      ),
+    );
+  }
+
   Widget _sectionLabel(String text) => Text(
     text,
     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
@@ -527,34 +553,73 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
   }
 
   // ---------------- Actions ----------------
-  Future<void> _onAddNotes() async {
-    final controller = TextEditingController(text: _notes);
-    final result = await showDialog<String>(
+  Future<void> _onPickPaymentMethod() async {
+    final picked = await showModalBottomSheet<_PaymentMethod>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Notes'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLines: 4,
-          maxLength: 200,
-          decoration: const InputDecoration(
-            hintText: 'Anything the driver should know?',
-          ),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            const Text(
+              'Payment Method',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: _methodIcon(_PaymentMethod.cash, size: 32),
+              title: Text(_methodLabel(_PaymentMethod.cash)),
+              trailing: _paymentMethod == _PaymentMethod.cash
+                  ? const Icon(Icons.check_circle, color: _brandRed)
+                  : null,
+              onTap: () => Navigator.of(ctx).pop(_PaymentMethod.cash),
+            ),
+            // Card payments aren't available yet: shown greyed out and
+            // not selectable.
+            Opacity(
+              opacity: 0.5,
+              child: ListTile(
+                enabled: false,
+                leading: _methodIcon(_PaymentMethod.card, size: 32),
+                title: Text(_methodLabel(_PaymentMethod.card)),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Coming soon',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('Save', style: TextStyle(color: _brandRed)),
-          ),
-        ],
       ),
     );
-    controller.dispose();
+    if (picked != null && mounted) setState(() => _paymentMethod = picked);
+  }
+
+  Future<void> _onAddNotes() async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true, // lets the sheet rise above the keyboard
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _NotesSheet(initial: _notes),
+    );
     if (result != null && mounted) setState(() => _notes = result);
   }
 
@@ -566,5 +631,102 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
       ..showSnackBar(
         const SnackBar(content: Text('Request submission coming soon')),
       );
+  }
+}
+
+/// Notes bottom sheet. It owns its own controller and disposes it in
+/// [dispose], which only runs after the sheet has finished closing.
+class _NotesSheet extends StatefulWidget {
+  final String initial;
+  const _NotesSheet({required this.initial});
+
+  @override
+  State<_NotesSheet> createState() => _NotesSheetState();
+}
+
+class _NotesSheetState extends State<_NotesSheet> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        // Keep the content above the keyboard.
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          16 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Center(
+              child: Text(
+                'Add Notes',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              maxLines: 4,
+              maxLength: 200,
+              decoration: InputDecoration(
+                hintText: 'Anything the driver should know?',
+                hintStyle: TextStyle(color: Colors.grey.shade500),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: Colors.grey.shade400),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: Colors.grey.shade400),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: Colors.black, width: 1.6),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: () =>
+                    Navigator.of(context).pop(_controller.text.trim()),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _brandRed,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: const Text(
+                  'Save',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
