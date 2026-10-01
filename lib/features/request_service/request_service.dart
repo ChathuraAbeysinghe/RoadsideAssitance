@@ -60,8 +60,8 @@ const Map<ServiceType, _ServiceConfig> _serviceConfigs = {
     iconPath: _placeholderIcon,
   ),
   ServiceType.mechanic: _ServiceConfig(
-    title: 'Request Mechanic',
-    subtitle: 'A mechanic will come to your location',
+    title: 'Request a Mechanic',
+    subtitle: 'Get on-site inspection and roadside repairs',
     iconPath: _placeholderIcon,
   ),
   ServiceType.batteryBoost: _ServiceConfig(
@@ -228,6 +228,12 @@ class _RequestServicePageState extends State<RequestServicePage>
   bool _dialogShowing = false;
 
   _ServiceConfig get _config => _serviceConfigs[widget.serviceType]!;
+
+  bool get _isTow => widget.serviceType == ServiceType.towTruck;
+  bool get _isMechanic => widget.serviceType == ServiceType.mechanic;
+
+  /// Services that use the vehicle button and prefill location from GPS.
+  bool get _usesVehicle => _isTow || _isMechanic;
 
   @override
   void initState() {
@@ -459,7 +465,9 @@ class _RequestServicePageState extends State<RequestServicePage>
   }
 
   Widget _buildPickingBanner() {
-    final label = _activeField == _PickTarget.pickup ? 'pickup' : 'drop-off';
+    final label = _isMechanic
+        ? 'location'
+        : (_activeField == _PickTarget.pickup ? 'pickup' : 'drop-off');
     return SafeArea(
       child: Align(
         alignment: Alignment.topCenter,
@@ -577,6 +585,7 @@ class _RequestServicePageState extends State<RequestServicePage>
       case ServiceType.towTruck:
         return _buildTowingDetails();
       case ServiceType.mechanic:
+        return _buildMechanicDetails();
       case ServiceType.batteryBoost:
       case ServiceType.flatTireChange:
       case ServiceType.fuelDelivery:
@@ -676,6 +685,62 @@ class _RequestServicePageState extends State<RequestServicePage>
             const SizedBox(width: 12),
             Expanded(child: _buildRouteSummary()),
           ],
+        ),
+      ],
+    );
+  }
+
+  // ---------------- Mechanic ----------------
+  Widget _buildMechanicDetails() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(alignment: Alignment.centerLeft, child: _buildVehicleButton()),
+        const SizedBox(height: 18),
+        const Text(
+          'Location',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade400),
+          ),
+          child: Row(
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _startRepick(_PickTarget.pickup),
+                child: const Icon(Icons.location_on_outlined, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _locationField(
+                  _pickupController,
+                  'Enter Your Location',
+                  _PickTarget.pickup,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        OutlinedButton.icon(
+          onPressed: _onSetLocationOnMap,
+          icon: const Icon(Icons.map_outlined, size: 20, color: Colors.black87),
+          label: const Text(
+            'Set Location on map',
+            style: TextStyle(color: Colors.black87, fontSize: 12),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            side: BorderSide(color: Colors.grey.shade400),
+          ),
         ),
       ],
     );
@@ -996,9 +1061,12 @@ class _RequestServicePageState extends State<RequestServicePage>
       _hasCenteredOnUser = true;
       _mapController.move(here, 16);
       // Prefill pickup once with the first fix (tow truck only).
-      if (widget.serviceType == ServiceType.towTruck) {
+      if (_usesVehicle) {
         _setPoint(_PickTarget.pickup, here).then((_) {
-          if (mounted) setState(() => _activeField = _PickTarget.dropoff);
+          // Only towing has a drop-off to move on to.
+          if (mounted && _isTow) {
+            setState(() => _activeField = _PickTarget.dropoff);
+          }
         });
       }
     }
@@ -1114,14 +1182,14 @@ class _RequestServicePageState extends State<RequestServicePage>
     await _setPoint(target, point);
 
     // After setting pickup, move on to drop-off automatically.
-    if (mounted && target == _PickTarget.pickup && _dropoff == null) {
+    if (mounted && _isTow && target == _PickTarget.pickup && _dropoff == null) {
       setState(() => _activeField = _PickTarget.dropoff);
     }
   }
 
   /// Loads the logged-in user's active vehicle (if any) on page load.
   Future<void> _loadActiveVehicle() async {
-    if (widget.serviceType != ServiceType.towTruck) {
+    if (!_usesVehicle) {
       _loadingVehicle = false;
       return;
     }
@@ -1227,9 +1295,12 @@ class _RequestServicePageState extends State<RequestServicePage>
   }
 
   void _onConfirm() {
-    if (widget.serviceType == ServiceType.towTruck &&
-        (_pickup == null || _dropoff == null)) {
+    if (_isTow && (_pickup == null || _dropoff == null)) {
       _snack('Please set both pickup and drop-off locations');
+      return;
+    }
+    if (_isMechanic && _pickup == null) {
+      _snack('Please set your location');
       return;
     }
     // TODO: create the service request (pickup, dropoff, distance, duration).
