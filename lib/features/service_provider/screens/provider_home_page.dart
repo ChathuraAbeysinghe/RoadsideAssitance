@@ -29,6 +29,7 @@ class ProviderHomePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xfff8fafc),
       body: SafeArea(
+        top: false,
         child: StreamBuilder<List<ServiceRequest>>(
           stream: repository.watchRequests(_resolvedUid),
           builder: (context, activeSnapshot) =>
@@ -80,69 +81,139 @@ class _Dashboard extends StatelessWidget {
       0,
       (total, request) => total + request.price,
     );
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      children: [
-        Row(
-          children: [
-            const CircleAvatar(
-              radius: 25,
-              backgroundColor: Color(0xfff1f3f5),
-              child: Icon(Icons.person_outline, color: Colors.grey),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    userName,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Container(
+            color: const Color(0xFFE30613),
+            padding: EdgeInsets.fromLTRB(20, topPadding + 20, 20, 20),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 25,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      child: const Icon(Icons.person_outline, color: Colors.white),
                     ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Good Morning',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            userName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    CircleAvatar(
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      child: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(30),
                   ),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(radius: 5, backgroundColor: Colors.teal),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Online & Available', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                            Text('Ready to accept jobs', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: true,
+                        onChanged: (v) {},
+                        activeColor: Colors.teal,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              if (urgent != null)
+                _RequestCard(request: urgent, repository: repository)
+              else
+                const _EmptyRequest(),
+              const SizedBox(height: 24),
+              const Text(
+                "TODAY'S SUMMARY",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _Summary(label: 'Completed Jobs', value: '${completed.length}'),
+                  const SizedBox(width: 12),
+                  _Summary(label: 'Earnings', value: 'LKR $earnings', red: true),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Row(
+                children: [
+                  _Summary(label: 'Acceptance Rate', value: '87%', green: true),
+                  SizedBox(width: 12),
+                  _Summary(label: 'Avg Response', value: '4 min'),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   const Text(
-                    'Colombo, SL',
-                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                    "RECENT JOBS",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.grey),
+                  ),
+                  TextButton(
+                    onPressed: () {},
+                    child: const Text('See All', style: TextStyle(color: Color(0xFFE30613), fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),
-            ),
-            const Icon(Icons.notifications_none_rounded, size: 28),
-          ],
+              const SizedBox(height: 8),
+              if (completed.isEmpty)
+                const Text(
+                  'No completed jobs yet.',
+                  style: TextStyle(color: Colors.grey),
+                )
+              else
+                ...completed.map((request) => _CompletedCard(request: request)),
+            ]),
+          ),
         ),
-        const SizedBox(height: 20),
-        if (urgent != null)
-          _RequestCard(request: urgent, repository: repository)
-        else
-          const _EmptyRequest(),
-        const SizedBox(height: 24),
-        const Text(
-          "TODAY'S SUMMARY",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _Summary(label: 'Completed', value: '${completed.length} Jobs'),
-            const SizedBox(width: 12),
-            _Summary(label: 'Earnings', value: 'LKR $earnings', red: true),
-          ],
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          "TODAY'S COMPLETED LOG",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        if (completed.isEmpty)
-          const Text(
-            'No completed jobs yet.',
-            style: TextStyle(color: Colors.grey),
-          )
-        else
-          ...completed.map((request) => _CompletedCard(request: request)),
       ],
     );
   }
@@ -154,77 +225,209 @@ class _RequestCard extends StatelessWidget {
   const _RequestCard({required this.request, required this.repository});
   @override
   Widget build(BuildContext context) => Card(
+    elevation: 4,
+    shadowColor: Colors.red.withOpacity(0.2),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(18),
-      side: const BorderSide(color: Colors.red, width: 2),
+      side: const BorderSide(color: Color(0xFFE30613), width: 1.5),
     ),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'NEW URGENT DISPATCH',
-            style: TextStyle(color: Colors.red, fontWeight: FontWeight.w800),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: const BoxDecoration(
+            color: Color(0xFFE30613),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
-          const SizedBox(height: 14),
-          Row(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(
-                  '${request.serviceName} • ${request.driverName}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
+              const Row(
+                children: [
+                  CircleAvatar(radius: 4, backgroundColor: Colors.white),
+                  SizedBox(width: 8),
+                  Text(
+                    'NEW URGENT DISPATCH',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
                   ),
-                ),
+                ],
               ),
-              Text(
-                'LKR ${request.price}',
-                style: const TextStyle(
-                  color: Colors.red,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  '2 min left',
+                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            request.location,
-            style: const TextStyle(color: Colors.grey, fontSize: 15),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            request.vehicleLabel,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 16),
-          Row(
+        ),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () =>
-                      repository.updateRequestStatus(request.id, 'declined'),
-                  child: const Text('Decline'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          request.serviceName,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          request.driverName,
+                          style: const TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'LKR ${request.price}',
+                        style: const TextStyle(
+                          color: Color(0xFFE30613),
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const Text(
+                        'Estimated',
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.location_on_outlined, color: Color(0xFFE30613), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${request.location} • 3.2 km away',
+                    style: const TextStyle(color: Colors.black87, fontSize: 15),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xfff8fafc),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.directions_car_outlined, color: Colors.grey, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      request.vehicleLabel,
+                      style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.schedule, color: Color(0xFFE30613), size: 14),
+                        SizedBox(width: 4),
+                        Text('Urgent', style: TextStyle(color: Color(0xFFE30613), fontSize: 12, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
                   ),
-                  onPressed: () =>
-                      repository.updateRequestStatus(request.id, 'accepted'),
-                  child: const Text('Accept'),
-                ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.star, color: Colors.green, size: 14),
+                        SizedBox(width: 4),
+                        Text('4.9 Customer', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.near_me, color: Colors.blue, size: 14),
+                        SizedBox(width: 4),
+                        Text('3.2 km', style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () =>
+                          repository.updateRequestStatus(request.id, 'declined'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        side: BorderSide(color: Colors.grey.shade400),
+                      ),
+                      child: const Text('Decline', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE30613),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      onPressed: () =>
+                          repository.updateRequestStatus(request.id, 'accepted'),
+                      child: const Text('Accept Job', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }
@@ -255,24 +458,31 @@ class _Summary extends StatelessWidget {
   final String label;
   final String value;
   final bool red;
-  const _Summary({required this.label, required this.value, this.red = false});
+  final bool green;
+  const _Summary({required this.label, required this.value, this.red = false, this.green = false});
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.grey.shade200),
+        ),
+        color: Colors.white,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(color: Colors.grey)),
-              const SizedBox(height: 6),
+              Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: 24,
                   fontWeight: FontWeight.w800,
-                  color: red ? Colors.red : Colors.black,
+                  color: red ? const Color(0xFFE30613) : (green ? Colors.teal : Colors.black),
                 ),
               ),
             ],
@@ -288,16 +498,38 @@ class _CompletedCard extends StatelessWidget {
   const _CompletedCard({required this.request});
   @override
   Widget build(BuildContext context) => Card(
+    elevation: 0,
+    margin: const EdgeInsets.only(bottom: 12),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(color: Colors.grey.shade200),
+    ),
+    color: Colors.white,
     child: ListTile(
-      leading: const Icon(Icons.star_outline, color: Colors.red),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.star_outline, color: Color(0xFFE30613)),
+      ),
       title: Text(
         '${request.serviceName} • ${request.driverName}',
-        style: const TextStyle(fontWeight: FontWeight.w700),
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
       ),
-      subtitle: Text('LKR ${request.price}'),
-      trailing: const Text(
-        'Completed',
-        style: TextStyle(color: Colors.green, fontWeight: FontWeight.w700),
+      subtitle: Text('Today, 10:20 AM • LKR ${request.price}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.green.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Text(
+          'Completed',
+          style: TextStyle(color: Colors.green, fontWeight: FontWeight.w700, fontSize: 12),
+        ),
       ),
     ),
   );

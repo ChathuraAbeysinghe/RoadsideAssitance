@@ -28,6 +28,13 @@ class ProviderRepository {
     }, SetOptions(merge: true));
   }
 
+  Future<void> updateService(ProviderService service) async {
+    await _firestore
+        .collection('providerServices')
+        .doc(service.id)
+        .update(service.toMap());
+  }
+
   Future<void> deleteService(ProviderService service) async {
     await _firestore.collection('providerServices').doc(service.id).delete();
   }

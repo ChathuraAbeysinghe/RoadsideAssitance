@@ -23,6 +23,30 @@ class ProviderService {
     this.isActive = true,
   });
 
+  ProviderService copyWith({
+    String? id,
+    String? providerUid,
+    ServiceType? serviceType,
+    String? name,
+    String? vehicleTypes,
+    String? plateNumber,
+    String? location,
+    String? details,
+    bool? isActive,
+  }) {
+    return ProviderService(
+      id: id ?? this.id,
+      providerUid: providerUid ?? this.providerUid,
+      serviceType: serviceType ?? this.serviceType,
+      name: name ?? this.name,
+      vehicleTypes: vehicleTypes ?? this.vehicleTypes,
+      plateNumber: plateNumber ?? this.plateNumber,
+      location: location ?? this.location,
+      details: details ?? this.details,
+      isActive: isActive ?? this.isActive,
+    );
+  }
+
   factory ProviderService.fromMap(String id, Map<String, dynamic> map) {
     return ProviderService(
       id: id,

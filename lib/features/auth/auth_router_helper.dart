@@ -49,9 +49,9 @@ void _goToCompleteProfile(
       destination = CompleteProfilePage(uid: uid, phoneNumber: phoneNumber);
       break;
     case UserType.assistanceProvider:
-      destination = ServiceProviderCompleteProfilePage(
+      destination = ProviderHomePage(
         uid: uid,
-        phoneNumber: phoneNumber,
+        //phoneNumber: phoneNumber,
       );
       break;
   }
