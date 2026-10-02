@@ -79,10 +79,12 @@ class AppBottomNavBar extends StatelessWidget {
           : const ProviderHomePage(userType: UserType.assistanceProvider),
     ),
     _NavTab(
-      label: 'Vehicle',
+      label: userType == UserType.driver ? 'Vehicle' : 'Services',
       inactiveIconAssetPath: 'assets/images/wheel1.png',
       activeIconAssetPath: 'assets/images/wheel2.png',
-      destinationBuilder: (_) => VehicleListPage(uid: _uid),
+      destinationBuilder: (_) => userType == UserType.driver
+          ? VehicleListPage(uid: _uid)
+          : ProviderServicesPage(uid: _uid, userType: UserType.assistanceProvider),
     ),
     _NavTab(
       label: 'More',

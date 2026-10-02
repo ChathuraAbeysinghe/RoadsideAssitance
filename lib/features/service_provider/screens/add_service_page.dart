@@ -6,13 +6,15 @@ import '../services/provider_repository.dart';
 
 class AddServicePage extends StatefulWidget {
   final String uid;
-  const AddServicePage({super.key, required this.uid});
+  final ProviderService? existingService;
+
+  const AddServicePage({super.key, required this.uid, this.existingService});
   @override
   State<AddServicePage> createState() => _AddServicePageState();
 }
 
 class _AddServicePageState extends State<AddServicePage> {
-  ServiceType _type = ServiceType.towTruck;
+  late ServiceType _type;
   bool _saving = false;
   final _name = TextEditingController();
   final _vehicles = TextEditingController();
@@ -37,6 +39,20 @@ class _AddServicePageState extends State<AddServicePage> {
       };
 
   @override
+  void initState() {
+    super.initState();
+    final s = widget.existingService;
+    _type = s?.serviceType ?? ServiceType.towTruck;
+    if (s != null) {
+      _name.text = s.name;
+      _vehicles.text = s.vehicleTypes;
+      _plate.text = s.plateNumber;
+      _location.text = s.location;
+      _details.text = s.details;
+    }
+  }
+
+  @override
   void dispose() {
     for (final controller in [_name, _vehicles, _plate, _location, _details]) {
       controller.dispose();
@@ -56,18 +72,30 @@ class _AddServicePageState extends State<AddServicePage> {
     }
     setState(() => _saving = true);
     try {
-      await ProviderRepository().addService(
-        ProviderService(
-          id: '',
-          providerUid: widget.uid,
+      final s = widget.existingService;
+      if (s != null) {
+        await ProviderRepository().updateService(s.copyWith(
           serviceType: _type,
           name: _name.text.trim(),
           vehicleTypes: _vehicles.text.trim(),
           plateNumber: _plate.text.trim(),
           location: _location.text.trim(),
           details: _details.text.trim(),
-        ),
-      );
+        ));
+      } else {
+        await ProviderRepository().addService(
+          ProviderService(
+            id: '',
+            providerUid: widget.uid,
+            serviceType: _type,
+            name: _name.text.trim(),
+            vehicleTypes: _vehicles.text.trim(),
+            plateNumber: _plate.text.trim(),
+            location: _location.text.trim(),
+            details: _details.text.trim(),
+          ),
+        );
+      }
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
@@ -193,9 +221,9 @@ class _AddServicePageState extends State<AddServicePage> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          const Text(
-            'Add Service',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          Text(
+            widget.existingService != null ? 'Edit Service' : 'Add Service',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           Align(
             alignment: Alignment.centerLeft,

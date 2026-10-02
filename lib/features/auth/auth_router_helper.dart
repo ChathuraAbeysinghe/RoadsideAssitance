@@ -51,7 +51,7 @@ void _goToCompleteProfile(
     case UserType.assistanceProvider:
       destination = ProviderHomePage(
         uid: uid,
-        phoneNumber: phoneNumber,
+        //phoneNumber: phoneNumber,
       );
       break;
   }

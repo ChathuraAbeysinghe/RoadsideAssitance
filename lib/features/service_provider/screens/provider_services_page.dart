@@ -161,14 +161,35 @@ class _ServiceCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  service.name.isEmpty ? service.displayType : service.name,
-                  style: const TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        service.name.isEmpty ? service.displayType : service.name,
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: service.isActive ? Colors.black87 : Colors.grey.shade600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (!service.isActive) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade100,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Paused',
+                          style: TextStyle(fontSize: 10, color: Colors.deepOrange, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -183,12 +204,34 @@ class _ServiceCard extends StatelessWidget {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: Colors.black87),
             onSelected: (value) async {
-              if (value == 'delete') {
+              if (value == 'edit') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddServicePage(
+                      uid: service.providerUid,
+                      existingService: service,
+                    ),
+                  ),
+                );
+              } else if (value == 'toggle') {
+                await ProviderRepository().updateService(
+                  service.copyWith(isActive: !service.isActive),
+                );
+              } else if (value == 'delete') {
                 await ProviderRepository().deleteService(service);
               }
             },
-            itemBuilder: (_) => const [
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Text('Edit service'),
+              ),
               PopupMenuItem(
+                value: 'toggle',
+                child: Text(service.isActive ? 'Pause service' : 'Restart service'),
+              ),
+              const PopupMenuItem(
                 value: 'delete',
                 child: Text('Remove service', style: TextStyle(color: Colors.red)),
               ),
