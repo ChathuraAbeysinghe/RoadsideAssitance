@@ -27,7 +27,7 @@ class MyApp extends StatelessWidget {
           seedColor: const Color.fromARGB(255, 234, 5, 5),
         ),
       ),
-      home: const ProviderHomePage(),
+      home: const AuthGate(),
     );
   }
 }
