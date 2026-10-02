@@ -20,6 +20,22 @@ class _AddServicePageState extends State<AddServicePage> {
   final _location = TextEditingController();
   final _details = TextEditingController();
 
+  static const _typeOrder = [
+    ServiceType.towTruck,
+    ServiceType.mechanic,
+    ServiceType.fuelDelivery,
+    ServiceType.flatTireChange,
+    ServiceType.batteryBoost,
+  ];
+
+  String _labelFor(ServiceType type) => switch (type) {
+        ServiceType.towTruck => 'Vehicle Tow',
+        ServiceType.mechanic => 'Mechanic',
+        ServiceType.fuelDelivery => 'Fuel Delivery',
+        ServiceType.flatTireChange => 'Flat Tire',
+        ServiceType.batteryBoost => 'Battery Boost',
+      };
+
   @override
   void dispose() {
     for (final controller in [_name, _vehicles, _plate, _location, _details]) {
@@ -31,124 +47,253 @@ class _AddServicePageState extends State<AddServicePage> {
   Future<void> _save() async {
     if (widget.uid.isEmpty ||
         _name.text.trim().isEmpty ||
-        _plate.text.trim().isEmpty) {
+        _plate.text.trim().isEmpty ||
+        _details.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter your name and plate number.')),
+        const SnackBar(content: Text('Please fill in all required fields')),
       );
       return;
     }
     setState(() => _saving = true);
-    await ProviderRepository().addService(
-      ProviderService(
-        id: '',
-        providerUid: widget.uid,
-        serviceType: _type,
-        name: _name.text.trim(),
-        vehicleTypes: _vehicles.text.trim(),
-        plateNumber: _plate.text.trim(),
-        location: _location.text.trim(),
-        details: _details.text.trim(),
-      ),
-    );
-    if (mounted) Navigator.pop(context);
+    try {
+      await ProviderRepository().addService(
+        ProviderService(
+          id: '',
+          providerUid: widget.uid,
+          serviceType: _type,
+          name: _name.text.trim(),
+          vehicleTypes: _vehicles.text.trim(),
+          plateNumber: _plate.text.trim(),
+          location: _location.text.trim(),
+          details: _details.text.trim(),
+        ),
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save service. Try again.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text(
-        'Add Service',
-        style: TextStyle(fontWeight: FontWeight.w800),
-      ),
-      centerTitle: true,
-      leading: const BackButton(),
-    ),
-    body: ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-      children: [
-        const Text(
-          'Service Type',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: ServiceType.values
-              .map(
-                (type) => ChoiceChip(
-                  label: Text(_label(type)),
-                  selected: _type == type,
-                  onSelected: (_) => setState(() => _type = type),
-                  selectedColor: Colors.black,
-                  labelStyle: TextStyle(
-                    color: _type == type ? Colors.white : Colors.black,
-                    fontSize: 16,
-                  ),
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Service Type',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildTypeChips(),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'Details',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildLabeledField(
+                      controller: _location,
+                      label: 'Location',
+                      hint: 'e.g. Colombo',
+                    ),
+                    const SizedBox(height: 14),
+                    _buildLabeledField(
+                      controller: _name,
+                      label: 'Your Name',
+                      hint: 'e.g. Nuwan Perera',
+                      isRequired: true,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildLabeledField(
+                      controller: _vehicles,
+                      label: 'Truck Types',
+                      hint: 'e.g. Flatbed',
+                    ),
+                    const SizedBox(height: 14),
+                    _buildLabeledField(
+                      controller: _plate,
+                      label: 'Plate NO',
+                      hint: 'e.g. WP CAA-9081',
+                      isRequired: true,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildLabeledField(
+                      controller: _details,
+                      label: 'Details',
+                      hint: 'Describe your service',
+                      isRequired: true,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 44),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _saving ? null : _save,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE30613),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                        ),
+                        child: _saving
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : const Text(
+                                'Confirm',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
-              )
-              .toList(),
-        ),
-        const SizedBox(height: 28),
-        const Text(
-          'Details',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 8),
-        _field(_location, 'Location'),
-        _field(_name, 'Your Name *'),
-        _field(_vehicles, 'Truck Types'),
-        _field(_plate, 'Plate NO *'),
-        _field(_details, 'Details *', maxLines: 3),
-        const SizedBox(height: 20),
-        SizedBox(
-          height: 56,
-          child: ElevatedButton(
-            onPressed: _saving ? null : _save,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(32),
               ),
             ),
-            child: _saving
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    'Confirm',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                  ),
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _field(
-    TextEditingController controller,
-    String hint, {
-    int maxLines = 1,
-  }) => Padding(
-    padding: const EdgeInsets.only(top: 14),
-    child: TextField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 18,
+          ],
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Text(
+            'Add Service',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.chevron_left),
+              style: IconButton.styleFrom(
+                side: BorderSide(color: Colors.grey.shade300),
+                shape: const CircleBorder(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypeChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _typeOrder.map((type) {
+          final isSelected = type == _type;
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: ChoiceChip(
+              label: Text(_labelFor(type)),
+              selected: isSelected,
+              onSelected: (_) => setState(() => _type = type),
+              showCheckmark: false,
+              selectedColor: Colors.black,
+              backgroundColor: Colors.white,
+              labelStyle: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : Colors.black87,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+                side: BorderSide(
+                  color: isSelected ? Colors.black : Colors.grey.shade400,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildLabeledField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    bool isRequired = false,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        label: RichText(
+          text: TextSpan(
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            children: [
+              TextSpan(text: label),
+              if (isRequired)
+                const TextSpan(
+                  text: ' *',
+                  style: TextStyle(color: Color(0xFFE30613)),
+                ),
+            ],
+          ),
+        ),
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        hintText: hint,
+        hintStyle: TextStyle(color: Colors.grey.shade400),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.black, width: 1.6),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+      ),
+    );
+  }
 }
 
-String _label(ServiceType type) => switch (type) {
-  ServiceType.towTruck => 'Vehicle Tow',
-  ServiceType.mechanic => 'Mechanic',
-  ServiceType.fuelDelivery => 'Fuel Delivery',
-  ServiceType.flatTireChange => 'Flat Tire',
-  ServiceType.batteryBoost => 'Battery Boost',
-};

@@ -23,37 +23,65 @@ class ProviderServicesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Services',
-          style: TextStyle(fontWeight: FontWeight.w800),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(context),
+            Expanded(
+              child: StreamBuilder<List<ProviderService>>(
+                stream: ProviderRepository().watchServices(_resolvedUid),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return const _Message(message: 'Unable to load services.');
+                  }
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final services = snapshot.data!;
+                  if (services.isEmpty) {
+                    return _EmptyServices(uid: _resolvedUid);
+                  }
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                    children: [
+                      ...services.map((service) => _ServiceCard(service: service)),
+                      _AddServiceCard(uid: _resolvedUid),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-        centerTitle: true,
-        leading: const BackButton(),
-      ),
-      body: StreamBuilder<List<ProviderService>>(
-        stream: ProviderRepository().watchServices(_resolvedUid),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _Message(message: 'Unable to load services.');
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final services = snapshot.data!;
-          if (services.isEmpty) {
-            return _EmptyServices(uid: _resolvedUid);
-          }
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-            children: [
-              ...services.map((service) => _ServiceCard(service: service)),
-              _AddServiceCard(uid: _resolvedUid),
-            ],
-          );
-        },
       ),
       bottomNavigationBar: AppBottomNavBar(userType: userType, activeIndex: 2),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Text(
+            'Services',
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.chevron_left),
+              style: IconButton.styleFrom(
+                side: BorderSide(color: Colors.grey.shade300),
+                shape: const CircleBorder(),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -64,34 +92,51 @@ class _EmptyServices extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/icon/icon-add_service_emppage.png',
-              height: 210,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 0),
+          const Text(
+            'Your service will appear here',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'You don\'t have any service yet. Tap to add new service below',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+              height: 1.4,
             ),
-            const SizedBox(height: 28),
-            const Text(
-              'Your service will appear here',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Add your vehicles and list the services you provide so customers can find and book you.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 28),
-            _RedButton(
-              label: 'Add New Service',
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
               onPressed: () => _openAdd(context, uid),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE30613),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                ),
+              ),
+              child: const Text(
+                'Add New Service',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -103,39 +148,53 @@ class _ServiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Image.asset(
-          _serviceIcon(service.serviceType),
-          width: 56,
-          height: 56,
-          errorBuilder: (_, _, _) =>
-              const Icon(Icons.build_circle_outlined, size: 48),
-        ),
-        title: Text(
-          service.name.isEmpty ? service.displayType : service.name,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          service.plateNumber.isEmpty
-              ? service.displayType
-              : service.plateNumber,
-          style: const TextStyle(fontSize: 18, color: Colors.grey),
-        ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) async {
-            if (value == 'delete') {
-              await ProviderRepository().deleteService(service);
-            }
-          },
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'delete', child: Text('Remove service')),
-          ],
-        ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  service.name.isEmpty ? service.displayType : service.name,
+                  style: const TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  service.plateNumber.isEmpty
+                      ? service.displayType
+                      : service.plateNumber,
+                  style: TextStyle(fontSize: 13.5, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: Colors.black87),
+            onSelected: (value) async {
+              if (value == 'delete') {
+                await ProviderRepository().deleteService(service);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'delete',
+                child: Text('Remove service', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -146,17 +205,29 @@ class _AddServiceCard extends StatelessWidget {
   const _AddServiceCard({required this.uid});
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    elevation: 2,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-    child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 26, vertical: 10),
-      leading: const Icon(Icons.add, size: 38),
-      title: const Text('Add Service', style: TextStyle(fontSize: 20)),
+  Widget build(BuildContext context) {
+    return InkWell(
       onTap: () => _openAdd(context, uid),
-    ),
-  );
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.add_rounded, size: 22, color: Colors.black87),
+            SizedBox(width: 14),
+            Text(
+              'Add Service',
+              style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _Message extends StatelessWidget {
@@ -166,29 +237,6 @@ class _Message extends StatelessWidget {
   Widget build(BuildContext context) => Center(child: Text(message));
 }
 
-class _RedButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onPressed;
-  const _RedButton({required this.label, required this.onPressed});
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: double.infinity,
-    child: ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.red,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-      ),
-    ),
-  );
-}
-
 void _openAdd(BuildContext context, String uid) {
   Navigator.push(
     context,
@@ -196,10 +244,3 @@ void _openAdd(BuildContext context, String uid) {
   );
 }
 
-String _serviceIcon(ServiceType type) => switch (type) {
-  ServiceType.towTruck => 'assets/images/icon-towtruck.png',
-  ServiceType.mechanic => 'assets/images/icon-mechanic.png',
-  ServiceType.fuelDelivery => 'assets/images/icon-jerrycan.png',
-  ServiceType.flatTireChange => 'assets/images/icon-flattire.png',
-  ServiceType.batteryBoost => 'assets/images/icon-battery.png',
-};
