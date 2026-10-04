@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../entities/app_user.dart';
 import '../_share/navbar/app_bottom_nav_bar.dart';
+import '../profile/profile_page.dart';
 import '../request_service/request_service.dart';
 
 class HomePage extends StatefulWidget {
@@ -28,7 +29,7 @@ class _HomePageState extends State<HomePage> {
   ];
 
   late final PageController _heroController;
-  late final Future<AppUser?> _userFuture;
+  late Future<AppUser?> _userFuture;
   Timer? _heroTimer;
   int _currentHeroPage = 0;
 
@@ -82,6 +83,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<void> _openProfile() async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ProfilePage()));
+    // Refresh the header so a changed name shows up when you come back.
+    if (!mounted) return;
+    setState(() {
+      _userFuture = _loadCurrentUser();
+    });
+  }
+
   @override
   void dispose() {
     _heroTimer?.cancel();
@@ -103,36 +114,40 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color.fromARGB(255, 196, 196, 196),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _openProfile,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color.fromARGB(255, 196, 196, 196),
+                    ),
                   ),
-                ),
-                child: ClipOval(
-                  child: profileImagePath.isEmpty
-                      ? Image.asset(
-                          'assets/images/profile.png',
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                        )
-                      : Image.network(
-                          profileImagePath,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Image.asset(
-                                'assets/images/profile.png',
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                              ),
-                        ),
+                  child: ClipOval(
+                    child: profileImagePath.isEmpty
+                        ? Image.asset(
+                            'assets/images/profile.png',
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.network(
+                            profileImagePath,
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Image.asset(
+                                  'assets/images/profile.png',
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                ),
+                          ),
+                  ),
                 ),
               ),
               Expanded(
