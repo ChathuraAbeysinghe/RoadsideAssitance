@@ -29,7 +29,7 @@ class _ServiceConfig {
 }
 
 const String _placeholderIcon = 'assets/images/icon-towtruck.png';
-const String _pickupPinPath = 'assets/images/pickup-point.png';
+const String _pickupPinPath = 'assets/images/pickup-point2.png';
 const String _assistanceIcon = 'assets/images/assistance1.png';
 
 String _iconAssetFor(VehicleType type) => switch (type) {
@@ -683,7 +683,7 @@ class _RequestServicePageState extends State<RequestServicePage>
                   onTap: () => _startRepick(_PickTarget.dropoff),
                   child: const Icon(
                     Icons.location_on,
-                    color: Color.fromARGB(255, 0, 0, 0),
+                    color: Color.fromARGB(255, 210, 0, 0),
                     size: 40,
                   ),
                 ),
