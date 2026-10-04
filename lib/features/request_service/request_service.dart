@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../entities/app_user.dart';
+import '../../entities/service_request.dart'; // NearbyProvider, watchNearbyProviders, kSearchRadiiKm
 import '../../entities/vehicle.dart';
 import '../vehicles/add_vehicle_page.dart';
 import 'request_summary_page.dart';
@@ -28,7 +29,8 @@ class _ServiceConfig {
 }
 
 const String _placeholderIcon = 'assets/images/icon-towtruck.png';
-const String _pickupPinPath = 'assets/images/pickup-point.png';
+const String _pickupPinPath = 'assets/images/pickup-point2.png';
+const String _assistanceIcon = 'assets/images/assistance1.png';
 
 String _iconAssetFor(VehicleType type) => switch (type) {
   VehicleType.car => 'assets/images/vehicle-car.png',
@@ -231,6 +233,15 @@ class _RequestServicePageState extends State<RequestServicePage>
   StreamSubscription<Position>? _positionSub;
   bool _trackingActive = false;
 
+  // Live nearby assistance providers shown on the map.
+  StreamSubscription<List<NearbyProvider>>? _providersSub;
+  List<NearbyProvider> _providers = const [];
+
+  // Provider whose info card is open, and a cache of loaded details
+  // (name, rating, phone, photo).
+  String? _selectedUid;
+  final Map<String, Future<AppUser?>> _providerDetails = {};
+
   // Fuel delivery options
   int _liters = 5; // last valid value
   _FuelType _fuelType = _FuelType.petrol;
@@ -264,6 +275,7 @@ class _RequestServicePageState extends State<RequestServicePage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadActiveVehicle();
+    _watchProviders();
     // When the amount field loses focus, restore a valid value if it's
     // empty or 0.
     _litersFocus.addListener(() {
@@ -291,6 +303,7 @@ class _RequestServicePageState extends State<RequestServicePage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _providersSub?.cancel();
     _litersController.dispose();
     _litersFocus.dispose();
     _positionSub?.cancel();
@@ -298,6 +311,210 @@ class _RequestServicePageState extends State<RequestServicePage>
     _pickupController.dispose();
     _dropoffController.dispose();
     super.dispose();
+  }
+
+  // ---------------- Nearby providers ----------------
+  void _watchProviders() {
+    _providersSub = watchNearbyProviders(widget.serviceType).listen((list) {
+      if (mounted) setState(() => _providers = list);
+    }, onError: (_) {});
+  }
+
+  Future<AppUser?> _loadProvider(String uid) async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+    final data = doc.data();
+    if (data == null) return null;
+    return userFromMap(uid, data);
+  }
+
+  Widget _buildProviderMarkers(double radiusM) {
+    const distance = Distance();
+    final center = _pickup ?? _userLocation ?? _initialCenter;
+
+    final nearby = _providers.where((p) {
+      final point = LatLng(p.location.latitude, p.location.longitude);
+      return distance.as(LengthUnit.Meter, center, point) <= radiusM;
+    }).toList();
+
+    NearbyProvider? selected;
+    for (final p in nearby) {
+      if (p.uid == _selectedUid) selected = p;
+    }
+
+    return MarkerLayer(
+      markers: [
+        for (final p in nearby)
+          Marker(
+            key: ValueKey(p.uid),
+            point: LatLng(p.location.latitude, p.location.longitude),
+            width: 30,
+            height: 30,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _selectedUid = p.uid),
+              child: Image.asset(
+                _assistanceIcon,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.local_shipping,
+                  color: _brandRed,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+        // Info card, added last so it draws on top. It sits just above the
+        // tapped icon, like an info window on Google Maps.
+        if (selected != null)
+          Marker(
+            key: ValueKey('card-${selected.uid}'),
+            point: LatLng(
+              selected.location.latitude,
+              selected.location.longitude,
+            ),
+            width: 240,
+            height: 130,
+            alignment: Alignment.topCenter,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _buildProviderCard(selected.uid),
+                const SizedBox(height: 26), // clears the icon
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildProviderCard(String uid) {
+    return GestureDetector(
+      // Swallow taps so touching the card doesn't close it.
+      onTap: () {},
+      child: Container(
+        width: 230,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: FutureBuilder<AppUser?>(
+          future: _providerDetails.putIfAbsent(uid, () => _loadProvider(uid)),
+          builder: (context, snap) {
+            if (snap.connectionState != ConnectionState.done) {
+              return const SizedBox(
+                height: 44,
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              );
+            }
+            final user = snap.data;
+            if (user == null) {
+              return const SizedBox(
+                height: 44,
+                child: Center(child: Text('Details unavailable')),
+              );
+            }
+            return _providerCardContent(user);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _providerCardContent(AppUser user) {
+    final fallbackAvatar = ColoredBox(
+      color: Colors.grey.shade300,
+      child: Icon(Icons.person, color: Colors.grey.shade600),
+    );
+    final hasPhoto = user.profileImagePath.isNotEmpty;
+    final rating = user.rating;
+
+    return Row(
+      children: [
+        ClipOval(
+          child: SizedBox(
+            width: 46,
+            height: 46,
+            child: hasPhoto
+                ? Image.network(
+                    user.profileImagePath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => fallbackAvatar,
+                    loadingBuilder: (context, child, progress) =>
+                        progress == null ? child : fallbackAvatar,
+                  )
+                : fallbackAvatar,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                user.name.isEmpty ? 'Assistance' : user.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (user.phoneNumber.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(Icons.phone, size: 13, color: Colors.grey.shade700),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        user.phoneNumber,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  const Icon(Icons.star, size: 15, color: Colors.amber),
+                  const SizedBox(width: 3),
+                  Text(
+                    rating.count > 0
+                        ? '${rating.average.toStringAsFixed(1)} (${rating.count})'
+                        : 'No ratings yet',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   // ---------------- UI ----------------
@@ -377,7 +594,11 @@ class _RequestServicePageState extends State<RequestServicePage>
         initialCenter: _initialCenter,
         initialZoom: 15,
         onMapReady: _startLocationTracking,
-        onTap: (_, point) => _onMapTap(point),
+        onTap: (_, point) {
+          // Tapping the map also closes any open provider info card.
+          if (_selectedUid != null) setState(() => _selectedUid = null);
+          _onMapTap(point);
+        },
       ),
       children: [
         TileLayer(
@@ -462,13 +683,17 @@ class _RequestServicePageState extends State<RequestServicePage>
                   onTap: () => _startRepick(_PickTarget.dropoff),
                   child: const Icon(
                     Icons.location_on,
-                    color: Color.fromARGB(255, 0, 0, 0),
+                    color: Color.fromARGB(255, 210, 0, 0),
                     size: 40,
                   ),
                 ),
               ),
           ],
         ),
+        // Live nearby assistance. Last child so the info card draws on top.
+        // Hidden while picking so it can't swallow taps meant for choosing
+        // a location.
+        if (!_pickingOnMap) _buildProviderMarkers(kSearchRadiiKm.last * 1000),
       ],
     );
   }
