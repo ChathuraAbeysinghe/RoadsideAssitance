@@ -299,6 +299,7 @@ class _ProfilePageState extends State<ProfilePage> {
           'Profile',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
+        actions: [if (!_loading && _isProvider) _buildAvailabilityToggle()],
       ),
       body: _buildBody(),
     );
@@ -322,8 +323,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 32),
                 _buildInfo(user),
                 if (_isProvider) ...[
-                  const SizedBox(height: 28),
-                  _buildAvailabilityCard(),
                   const SizedBox(height: 28),
                   _buildServices(),
                 ],
@@ -375,33 +374,56 @@ class _ProfilePageState extends State<ProfilePage> {
             height: 116,
             child: Stack(
               children: [
+                // Providers get a ring (green = online, grey = offline) with a
+                // small gap between the ring and the photo.
                 Positioned.fill(
-                  child: ClipOval(
-                    child: user.profileImagePath.isNotEmpty
-                        ? Image.network(
-                            user.profileImagePath,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => fallback,
-                            loadingBuilder: (context, child, progress) =>
-                                progress == null ? child : fallback,
-                          )
-                        : fallback,
+                  child: Padding(
+                    padding: EdgeInsets.all(_isProvider ? 7 : 0),
+                    child: ClipOval(
+                      child: user.profileImagePath.isNotEmpty
+                          ? Image.network(
+                              user.profileImagePath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => fallback,
+                              loadingBuilder: (context, child, progress) =>
+                                  progress == null ? child : fallback,
+                            )
+                          : fallback,
+                    ),
                   ),
                 ),
                 if (_uploadingPhoto)
                   Positioned.fill(
-                    child: ClipOval(
-                      child: ColoredBox(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        child: const Center(
-                          child: SizedBox(
-                            width: 26,
-                            height: 26,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
+                    child: Padding(
+                      padding: EdgeInsets.all(_isProvider ? 7 : 0),
+                      child: ClipOval(
+                        child: ColoredBox(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_isProvider)
+                  Positioned.fill(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: (_provider?.isAvailable ?? false)
+                              ? _availableGreen
+                              : Colors.grey.shade400,
+                          width: 4,
                         ),
                       ),
                     ),
@@ -413,7 +435,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: _brandRed,
+                      color: Colors.grey.shade600,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 3),
                     ),
@@ -542,71 +564,24 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ---- Provider only: availability ----
-  Widget _buildAvailabilityCard() {
+  // ---- Provider only: availability toggle (app bar, top right) ----
+  Widget _buildAvailabilityToggle() {
     final available = _provider?.isAvailable ?? false;
-    final accent = available ? _availableGreen : Colors.grey.shade500;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-      decoration: BoxDecoration(
-        color: available
-            ? _availableGreen.withValues(alpha: 0.07)
-            : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: available
-              ? _availableGreen.withValues(alpha: 0.35)
-              : Colors.grey.shade300,
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Tooltip(
+        message: available ? 'Available for requests' : 'Not available',
+        child: Switch(
+          value: available,
+          onChanged: _setAvailability,
+          thumbColor: const WidgetStatePropertyAll(Colors.white),
+          trackColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? _availableGreen
+                : Colors.grey.shade400,
+          ),
+          trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              available ? Icons.wifi_tethering : Icons.portable_wifi_off,
-              size: 22,
-              color: accent,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Available for requests',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  available
-                      ? 'Customers can see you on the map'
-                      : 'You are hidden from customers',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: available,
-            onChanged: _setAvailability,
-            thumbColor: const WidgetStatePropertyAll(Colors.white),
-            trackColor: WidgetStateProperty.resolveWith(
-              (states) => states.contains(WidgetState.selected)
-                  ? _availableGreen
-                  : Colors.grey.shade400,
-            ),
-            trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
-          ),
-        ],
       ),
     );
   }
