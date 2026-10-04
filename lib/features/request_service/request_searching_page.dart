@@ -13,7 +13,7 @@ const Color _brandRed = Color(0xFFE30613);
 
 const String _searchMapImage = 'assets/images/search-map.jpg';
 const String _searchMagnifierImage = 'assets/images/search-magnifier.png';
-const String _pickupPinPath = 'assets/images/pickup-point.png';
+const String _assistanceIcon = 'assets/images/assistance1.png';
 const String _appPackageName = 'com.example.roadside_assitance';
 
 /// Padding used when fitting the search circle into the visible map.
@@ -46,11 +46,25 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
   /// Drives the map + magnifying glass animation in the sheet.
   late final AnimationController _searchAnim;
 
-  /// Drives the radar sweep and pulse rings on the map.
+  /// Drives the pulse rings on the map.
   late final AnimationController _radarAnim;
 
   StreamSubscription<ServiceRequest?>? _sub;
+
+  /// Live nearby providers shown on the map while searching.
+  StreamSubscription<List<NearbyProvider>>? _providersSub;
+  List<NearbyProvider> _providers = const [];
+
+  /// Provider whose info card is open on the map, and a cache of the
+  /// details we've already loaded (name, rating, phone, photo).
+  String? _selectedUid;
+  final Map<String, Future<AppUser?>> _providerDetails = {};
   Timer? _timer;
+
+  /// After the user stops moving the map, this puts it back to the default
+  /// view (centered on the pickup, whole search circle visible).
+  Timer? _recenterTimer;
+  static const Duration _recenterDelay = Duration(seconds: 5);
 
   ServiceRequest? _request;
   int _stage = 0;
@@ -82,7 +96,9 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
   @override
   void dispose() {
     _sub?.cancel();
+    _providersSub?.cancel();
     _timer?.cancel();
+    _recenterTimer?.cancel();
     _searchAnim.dispose();
     _radarAnim.dispose();
     _elapsedNotifier.dispose();
@@ -103,6 +119,14 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     if (r.status != RequestStatus.pending) {
       _timer?.cancel();
       _radarAnim.stop();
+      // Stop showing nearby providers once the search is over.
+      _providersSub?.cancel();
+      _providersSub = null;
+      _providers = const [];
+    } else {
+      _providersSub ??= watchNearbyProviders(r.serviceType).listen((list) {
+        if (mounted) setState(() => _providers = list);
+      }, onError: (_) {});
     }
 
     setState(() => _request = r);
@@ -155,6 +179,14 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     return [0.0, 90.0, 180.0, 270.0]
         .map((bearing) => distance.offset(widget.pickup, meters, bearing))
         .toList();
+  }
+
+  /// Called whenever the user touches the map. Restarts the 5 second wait.
+  void _scheduleRecenter() {
+    _recenterTimer?.cancel();
+    _recenterTimer = Timer(_recenterDelay, () {
+      if (mounted) _fitMapToRadius();
+    });
   }
 
   void _fitMapToRadius() {
@@ -296,70 +328,222 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     );
   }
 
-  // ---------------- Radar ----------------
-  /// A pie slice from the pickup point out to [radiusM], between the two
-  /// bearings (degrees).
-  List<LatLng> _sector(double radiusM, double fromDeg, double toDeg) {
-    const distance = Distance();
-    const steps = 10;
-    final points = <LatLng>[widget.pickup];
-    for (var i = 0; i <= steps; i++) {
-      final bearing = fromDeg + (toDeg - fromDeg) * i / steps;
-      points.add(distance.offset(widget.pickup, radiusM, bearing % 360));
-    }
-    return points;
-  }
-
-  /// Rotating sweep with a fading trail, plus two expanding pulse rings.
-  Widget _buildRadarLayers(double radiusM) {
+  // ---------------- Pulse rings ----------------
+  /// Rings that start at the pickup point and expand out to the edge of
+  /// the search radius, fading as they grow.
+  Widget _buildPulseRings(double radiusM) {
     return AnimatedBuilder(
       animation: _radarAnim,
       builder: (context, _) {
         final v = _radarAnim.value;
-        final lead = v * 360;
-        const slice = 22.0;
-        const alphas = [0.30, 0.18, 0.09, 0.04];
 
-        final sweeps = <Polygon>[
-          for (var k = 0; k < alphas.length; k++)
-            Polygon(
-              points: _sector(
-                radiusM,
-                lead - slice * (k + 1),
-                lead - slice * k,
-              ),
-              color: _brandRed.withValues(alpha: alphas[k]),
-              borderStrokeWidth: 0,
-            ),
-        ];
-
-        final rings = <CircleMarker>[
-          for (final offset in const [0.0, 0.5])
-            () {
-              final p = (v + offset) % 1;
-              return CircleMarker(
-                point: widget.pickup,
-                radius: radiusM * p,
-                useRadiusInMeter: true,
-                color: Colors.transparent,
-                borderColor: const Color.fromARGB(
-                  255,
-                  255,
-                  221,
-                  0,
-                ).withValues(alpha: 0.45 * (1 - p)),
-                borderStrokeWidth: 2,
-              );
-            }(),
-        ];
-
-        return Stack(
-          children: [
-            PolygonLayer(polygons: sweeps),
-            CircleLayer(circles: rings),
+        return CircleLayer(
+          circles: [
+            for (final offset in const [0.0, 1 / 3, 2 / 3])
+              () {
+                final p = (v + offset) % 1;
+                return CircleMarker(
+                  point: widget.pickup,
+                  radius: radiusM * p,
+                  useRadiusInMeter: true,
+                  color: Colors.transparent,
+                  borderColor: const Color.fromARGB(
+                    255,
+                    255,
+                    0,
+                    0,
+                  ).withValues(alpha: 0.6 * (1 - p)),
+                  borderStrokeWidth: 2.5,
+                );
+              }(),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildProviderMarkers(double radiusM) {
+    const distance = Distance();
+    final nearby = _providers.where((p) {
+      final point = LatLng(p.location.latitude, p.location.longitude);
+      return distance.as(LengthUnit.Meter, widget.pickup, point) <= radiusM;
+    }).toList();
+
+    NearbyProvider? selected;
+    for (final p in nearby) {
+      if (p.uid == _selectedUid) selected = p;
+    }
+
+    return MarkerLayer(
+      markers: [
+        for (final p in nearby)
+          Marker(
+            key: ValueKey(p.uid),
+            point: LatLng(p.location.latitude, p.location.longitude),
+            width: 30,
+            height: 30,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _selectedUid = p.uid),
+              child: Image.asset(
+                _assistanceIcon,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.local_shipping,
+                  color: _brandRed,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+        // Info card, added last so it draws on top. It sits just above the
+        // tapped icon, like an info window on Google Maps.
+        if (selected != null)
+          Marker(
+            key: ValueKey('card-${selected.uid}'),
+            point: LatLng(
+              selected.location.latitude,
+              selected.location.longitude,
+            ),
+            width: 240,
+            height: 130,
+            alignment: Alignment.topCenter,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                _buildProviderCard(selected.uid),
+                const SizedBox(height: 26), // clears the 44px icon
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildProviderCard(String uid) {
+    return GestureDetector(
+      // Swallow taps so touching the card doesn't close it.
+      onTap: () {},
+      child: Container(
+        width: 230,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: FutureBuilder<AppUser?>(
+          future: _providerDetails.putIfAbsent(uid, () => _loadProvider(uid)),
+          builder: (context, snap) {
+            if (snap.connectionState != ConnectionState.done) {
+              return const SizedBox(
+                height: 44,
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              );
+            }
+            final user = snap.data;
+            if (user == null) {
+              return const SizedBox(
+                height: 44,
+                child: Center(child: Text('Details unavailable')),
+              );
+            }
+            return _providerCardContent(user);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _providerCardContent(AppUser user) {
+    final fallbackAvatar = ColoredBox(
+      color: Colors.grey.shade300,
+      child: Icon(Icons.person, color: Colors.grey.shade600),
+    );
+    final hasPhoto = user.profileImagePath.isNotEmpty;
+    final rating = user.rating;
+
+    return Row(
+      children: [
+        ClipOval(
+          child: SizedBox(
+            width: 46,
+            height: 46,
+            child: hasPhoto
+                ? Image.network(
+                    user.profileImagePath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => fallbackAvatar,
+                    loadingBuilder: (context, child, progress) =>
+                        progress == null ? child : fallbackAvatar,
+                  )
+                : fallbackAvatar,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                user.name.isEmpty ? 'Assistance' : user.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (user.phoneNumber.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(Icons.phone, size: 13, color: Colors.grey.shade700),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        user.phoneNumber,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  const Icon(Icons.star, size: 15, color: Colors.amber),
+                  const SizedBox(width: 3),
+                  Text(
+                    rating.count > 0
+                        ? '${rating.average.toStringAsFixed(1)} (${rating.count})'
+                        : 'No ratings yet',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -375,9 +559,18 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
           coordinates: _radiusExtent(kSearchRadiiKm.first),
           padding: _mapFitPadding,
         ),
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.none,
+        // Pinch to zoom and drag are allowed; rotation stays off.
+        interactionOptions: InteractionOptions(
+          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
         ),
+        // hasGesture is true only for finger input, so the automatic
+        // recenter below doesn't trigger itself.
+        onTap: (_, __) {
+          if (_selectedUid != null) setState(() => _selectedUid = null);
+        },
+        onPositionChanged: (position, hasGesture) {
+          if (hasGesture) _scheduleRecenter();
+        },
       ),
       children: [
         TileLayer(
@@ -394,7 +587,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
               color: const Color.fromARGB(
                 255,
                 253,
-                144,
+                1,
                 1,
               ).withValues(alpha: 0.08),
               borderColor: const Color.fromARGB(
@@ -407,27 +600,10 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
             ),
           ],
         ),
-        // Radar animation (only while searching).
-        if (searching) _buildRadarLayers(radiusKm * 1000),
-        MarkerLayer(
-          markers: [
-            Marker(
-              point: widget.pickup,
-              width: 40,
-              height: 48,
-              alignment: Alignment.topCenter,
-              child: Image.asset(
-                _pickupPinPath,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.location_on,
-                  color: Colors.green,
-                  size: 40,
-                ),
-              ),
-            ),
-          ],
-        ),
+        // Expanding rings (only while searching).
+        if (searching) _buildPulseRings(radiusKm * 1000),
+        // Nearby assistance, live, only those inside the search radius.
+        if (searching) _buildProviderMarkers(radiusKm * 1000),
       ],
     );
   }
