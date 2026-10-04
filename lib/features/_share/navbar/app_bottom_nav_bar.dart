@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../entities/app_user.dart';
 import '../../home/home_page.dart';
 import '../../home/assistance_provider_home_page.dart';
+import '../../more/more_page.dart';
 import '../../vehicles/vehicle_list_page.dart';
 
 /// One tab in [AppBottomNavBar]. Fully internal now — hosting pages never
@@ -35,6 +36,9 @@ class _NavTab {
 ///
 /// // On VehicleListPage's build():
 /// AppBottomNavBar(userType: userType, activeIndex: 2),
+///
+/// // On MorePage's build():
+/// AppBottomNavBar(userType: userType, activeIndex: 3),
 /// ```
 ///
 /// Tapping the already-active tab does nothing (no duplicate page push).
@@ -90,11 +94,8 @@ class AppBottomNavBar extends StatelessWidget {
       label: 'More',
       inactiveIconAssetPath: 'assets/images/application1.png',
       activeIconAssetPath: 'assets/images/application2.png',
-      destinationBuilder: (_) => userType == UserType.driver
-          ? const HomePage(userType: UserType.driver)
-          : const AssistanceProviderHomePage(
-              userType: UserType.assistanceProvider,
-            ),
+      // Same page for both roles; the role is only used for the navbar.
+      destinationBuilder: (_) => MorePage(userType: userType),
     ),
   ];
 
