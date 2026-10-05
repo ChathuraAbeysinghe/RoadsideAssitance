@@ -285,3 +285,40 @@ Stream<List<ServiceRequest>> watchPendingRequests(Set<ServiceType> services) {
             .toList(),
       );
 }
+
+// ============================================================
+// Nearby providers (for the live map on the searching screen)
+// ============================================================
+
+class NearbyProvider {
+  final String uid;
+  final GeoLocation location;
+  const NearbyProvider({required this.uid, required this.location});
+}
+
+/// Live list of available providers that offer [service], with their
+/// current location. Distance filtering happens on the device.
+///
+/// NOTE: this query may ask for a composite index on `users`
+/// (userType, isAvailable, services). Firestore prints a link to create it
+/// in the debug console the first time it runs.
+Stream<List<NearbyProvider>> watchNearbyProviders(ServiceType service) {
+  return FirebaseFirestore.instance
+      .collection('users')
+      .where('userType', isEqualTo: UserType.assistanceProvider.name)
+      .where('isAvailable', isEqualTo: true)
+      .where('services', arrayContains: service.name)
+      .snapshots()
+      .map((snap) {
+        final list = <NearbyProvider>[];
+        for (final d in snap.docs) {
+          final loc = GeoLocation.fromMap(
+            d.data()['currentLocation'] as Map<String, dynamic>?,
+          );
+          // Skip providers that haven't reported a location yet.
+          if (loc.latitude == 0 && loc.longitude == 0) continue;
+          list.add(NearbyProvider(uid: d.id, location: loc));
+        }
+        return list;
+      });
+}
