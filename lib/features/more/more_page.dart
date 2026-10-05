@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../entities/app_user.dart';
+import '../../main.dart';
 import '../_share/navbar/app_bottom_nav_bar.dart';
 import '../profile/profile_page.dart';
 
@@ -68,8 +69,11 @@ class MorePage extends StatelessWidget {
       return;
     }
     if (!context.mounted) return;
-    // Back to the root route (your auth gate / login screen).
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    // Back to the root route (AuthGate), clearing all other routes.
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthGate()),
+      (route) => false,
+    );
   }
 
   void _showContact(BuildContext context) {
