@@ -5,6 +5,7 @@ import '../../../entities/app_user.dart';
 import '../../home/home_page.dart';
 import '../../home/assistance_provider_home_page.dart';
 import '../../more/more_page.dart';
+import '../../requests/requests_page.dart';
 import '../../vehicles/vehicle_list_page.dart';
 
 /// One tab in [AppBottomNavBar]. Fully internal now — hosting pages never
@@ -79,7 +80,7 @@ class AppBottomNavBar extends StatelessWidget {
       inactiveIconAssetPath: 'assets/images/clipboard1.png',
       activeIconAssetPath: 'assets/images/clipboard2.png',
       destinationBuilder: (_) => userType == UserType.driver
-          ? const HomePage(userType: UserType.driver)
+          ? RequestsPage(userType: userType)
           : const AssistanceProviderHomePage(
               userType: UserType.assistanceProvider,
             ),
