@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../entities/app_user.dart';
 import '../home/home_page.dart';
-import '../home/assistance_provider_home_page.dart';
+import '../service_provider/screens/provider_home_page.dart';
 import 'screens/complete_profile_page.dart';
 import 'screens/service_provider_complete_profile_page.dart';
 
@@ -49,9 +49,9 @@ void _goToCompleteProfile(
       destination = CompleteProfilePage(uid: uid, phoneNumber: phoneNumber);
       break;
     case UserType.assistanceProvider:
-      destination = ServiceProviderCompleteProfilePage(
+      destination = ProviderHomePage(
         uid: uid,
-        phoneNumber: phoneNumber,
+        //phoneNumber: phoneNumber,
       );
       break;
   }
@@ -69,7 +69,7 @@ void _goToRoleHome(BuildContext context, AppUser user) {
       break;
     case UserType.assistanceProvider:
       final provider = user as AssistanceProvider;
-      destination = AssistanceProviderHomePage(
+      destination = ProviderHomePage(
         userType: user.userType,
         userName: provider.name,
         profileImagePath: provider.profileImagePath,
