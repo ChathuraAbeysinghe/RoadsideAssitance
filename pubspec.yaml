@@ -23,6 +23,7 @@ dependencies:
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
   geolocator: ^14.1.1
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
@@ -35,6 +36,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/icon/
 
 flutter_launcher_icons:
   android: true

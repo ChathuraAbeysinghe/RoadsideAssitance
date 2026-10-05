@@ -477,26 +477,6 @@ class _RequestServicePageState extends State<RequestServicePage>
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              if (user.phoneNumber.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(Icons.phone, size: 13, color: Colors.grey.shade700),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        user.phoneNumber,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
               const SizedBox(height: 2),
               Row(
                 children: [

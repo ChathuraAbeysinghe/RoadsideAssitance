@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 
 import '../../../entities/app_user.dart';
 import '../../home/home_page.dart';
-import '../../home/assistance_provider_home_page.dart';
 import '../../more/more_page.dart';
 import '../../requests/requests_page.dart';
+import '../../service_provider/screens/provider_home_page.dart';
+import '../../service_provider/screens/provider_jobs_page.dart';
+import '../../service_provider/screens/provider_services_page.dart';
 import '../../vehicles/vehicle_list_page.dart';
 
 /// One tab in [AppBottomNavBar]. Fully internal now — hosting pages never
@@ -71,9 +73,7 @@ class AppBottomNavBar extends StatelessWidget {
       activeIconAssetPath: 'assets/images/home2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
-          : const AssistanceProviderHomePage(
-              userType: UserType.assistanceProvider,
-            ),
+          : const ProviderHomePage(userType: UserType.assistanceProvider),
     ),
     _NavTab(
       label: userType == UserType.driver ? 'Requests' : 'Job',
@@ -81,21 +81,23 @@ class AppBottomNavBar extends StatelessWidget {
       activeIconAssetPath: 'assets/images/clipboard2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? RequestsPage(userType: userType)
-          : const AssistanceProviderHomePage(
-              userType: UserType.assistanceProvider,
-            ),
+          : const ProviderJobsPage(),
     ),
     _NavTab(
-      label: 'Vehicle',
+      label: userType == UserType.driver ? 'Vehicle' : 'Services',
       inactiveIconAssetPath: 'assets/images/wheel1.png',
       activeIconAssetPath: 'assets/images/wheel2.png',
-      destinationBuilder: (_) => VehicleListPage(uid: _uid),
+      destinationBuilder: (_) => userType == UserType.driver
+          ? VehicleListPage(uid: _uid)
+          : ProviderServicesPage(
+              uid: _uid,
+              userType: UserType.assistanceProvider,
+            ),
     ),
     _NavTab(
       label: 'More',
       inactiveIconAssetPath: 'assets/images/application1.png',
       activeIconAssetPath: 'assets/images/application2.png',
-      // Same page for both roles; the role is only used for the navbar.
       destinationBuilder: (_) => MorePage(userType: userType),
     ),
   ];
