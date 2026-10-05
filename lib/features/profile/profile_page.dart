@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../cloudinary_service.dart';
 import '../../entities/app_user.dart';
+import '../../services/provider_location_service.dart';
 
 const Color _brandRed = Color(0xFFE30613);
 const Color _availableGreen = Color(0xFF16A34A);
@@ -270,6 +271,7 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _user = provider.copyWith(isAvailable: value));
     try {
       await doc.update({'isAvailable': value});
+      await ProviderLocationService.instance.refresh();
     } catch (_) {
       if (!mounted) return;
       setState(() => _user = previous);

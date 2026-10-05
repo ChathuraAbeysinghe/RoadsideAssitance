@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../entities/app_user.dart';
 import '../../entities/service_request.dart';
+import '../../services/customer_location_sharer.dart';
 
 const Color _brandRed = Color(0xFFE30613);
 
@@ -42,6 +43,7 @@ class RequestSearchingPage extends StatefulWidget {
 class _RequestSearchingPageState extends State<RequestSearchingPage>
     with TickerProviderStateMixin {
   final _mapController = MapController();
+  final _sharer = CustomerLocationSharer();
 
   /// Drives the map + magnifying glass animation in the sheet.
   late final AnimationController _searchAnim;
@@ -95,6 +97,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
 
   @override
   void dispose() {
+    _sharer.stop();
     _sub?.cancel();
     _providersSub?.cancel();
     _timer?.cancel();
@@ -117,6 +120,11 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
       _providerFuture ??= _loadProvider(r.providerUid!);
     }
     if (r.status != RequestStatus.pending) {
+      if (r.status == RequestStatus.accepted || r.status == RequestStatus.onTheWay || r.status == RequestStatus.arrived || r.status == RequestStatus.inProgress) {
+        _sharer.start(r.id);
+      } else {
+        _sharer.stop();
+      }
       _timer?.cancel();
       _radarAnim.stop();
       // Stop showing nearby providers once the search is over.
@@ -507,26 +515,6 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              if (user.phoneNumber.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(Icons.phone, size: 13, color: Colors.grey.shade700),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        user.phoneNumber,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
               const SizedBox(height: 2),
               Row(
                 children: [

@@ -28,6 +28,7 @@ class ProviderLocationService {
   static const Duration _minWriteGap = Duration(seconds: 5);
 
   StreamSubscription<Position>? _sub;
+  Timer? _heartbeat;
   String? _uid;
   DateTime _lastWrite = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -64,12 +65,23 @@ class ProviderLocationService {
       final data = doc.data();
       final isProvider = data?['userType'] == 'assistanceProvider';
       final available = data?['isAvailable'] as bool? ?? true;
-      if (isProvider && available) {
+      final onJob = isProvider && await _hasActiveJob(user.uid);
+      if (isProvider && (available || onJob)) {
         await start(user.uid);
       } else {
         await stop();
       }
     } catch (_) {}
+  }
+
+  Future<bool> _hasActiveJob(String uid) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('service_requests')
+        .where('providerUid', isEqualTo: uid)
+        .where('status', whereIn: ['accepted', 'onTheWay', 'arrived', 'inProgress'])
+        .limit(1)
+        .get();
+    return snap.docs.isNotEmpty;
   }
 
   /// Starts sharing. Returns false if location is off or permission was
@@ -88,6 +100,13 @@ class ProviderLocationService {
       _sub = Geolocator.getPositionStream(locationSettings: _settings())
           .listen(_onPosition, onError: (_) {});
 
+      _heartbeat?.cancel();
+      _heartbeat = Timer.periodic(const Duration(seconds: 45), (_) async {
+        try {
+          _onPosition(await Geolocator.getCurrentPosition(), force: true);
+        } catch (_) {}
+      });
+
       // Write one position straight away so customers see this provider
       // without waiting for the first movement.
       try {
@@ -102,6 +121,8 @@ class ProviderLocationService {
   Future<void> stop() async {
     await _sub?.cancel();
     _sub = null;
+    _heartbeat?.cancel();
+    _heartbeat = null;
     _uid = null;
   }
 

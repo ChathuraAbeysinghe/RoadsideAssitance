@@ -5,7 +5,7 @@ import '../../entities/app_user.dart';
 import '../home/home_page.dart';
 import '../service_provider/screens/provider_home_page.dart';
 import 'screens/complete_profile_page.dart';
-import 'screens/service_provider_complete_profile_page.dart';
+//import 'screens/service_provider_complete_profile_page.dart';
 
 /// After a successful sign-in, checks whether this user already has
 /// a profile in Firestore.
