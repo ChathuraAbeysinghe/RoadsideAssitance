@@ -11,12 +11,12 @@ import 'request_searching_page.dart'; // adjust path if needed
 const Color _brandRed = Color(0xFFE30613);
 const Color _editBlue = Color(0xFF1B7F9E);
 
-const String _truckPinIcon = 'assets/images/icon-towtruck.png';
+const String _truckPinIcon = 'assets/images/pickup-point.png';
 const String _cartoonTruck = 'assets/images/cartoon-truck.png';
 const String _cartoonMechanic = 'assets/images/cartoon-mechanic.png';
 const String _cartoonFuel = 'assets/images/cartoon-fuel.png';
 const String _cartoonTire = 'assets/images/cartoon-tire.png';
-const String _cartoonBattery = 'assets/images/cartoon-battery.png';
+const String _cartoonBattery = 'assets/images/cartoon-cables.png';
 const String _noteIcon = 'assets/images/note.png';
 const String _cashIcon = 'assets/images/cash.png';
 const String _cardIcon = 'assets/images/card.png';
