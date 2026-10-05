@@ -59,6 +59,11 @@ class ServiceRequest {
   final GeoLocation? dropoff;
   final String? dropoffAddress;
 
+  final GeoLocation? customerLocation;   // live position written by the customer app
+  final DateTime? acceptedAt;
+  final DateTime? completedAt;
+  final String? cancelledBy;             // 'customer' | 'provider'
+
   /// Snapshot of the vehicle at request time (id, make, model, plate...).
   final Map<String, dynamic>? vehicle;
   final String notes;
@@ -89,6 +94,10 @@ class ServiceRequest {
     required this.pickupAddress,
     this.dropoff,
     this.dropoffAddress,
+    this.customerLocation,
+    this.acceptedAt,
+    this.completedAt,
+    this.cancelledBy,
     this.vehicle,
     this.notes = '',
     this.liters,
@@ -119,6 +128,12 @@ class ServiceRequest {
           ? null
           : GeoLocation.fromMap(map['dropoff'] as Map<String, dynamic>?),
       dropoffAddress: map['dropoffAddress'] as String?,
+      customerLocation: map['customerLocation'] == null
+          ? null
+          : GeoLocation.fromMap(map['customerLocation'] as Map<String, dynamic>?),
+      acceptedAt: ts(map['acceptedAt']),
+      completedAt: ts(map['completedAt']),
+      cancelledBy: map['cancelledBy'] as String?,
       vehicle: (map['vehicle'] as Map?)?.cast<String, dynamic>(),
       notes: map['notes'] as String? ?? '',
       liters: (map['liters'] as num?)?.toInt(),
@@ -198,15 +213,29 @@ Future<void> updateSearchRadius(String id, double km) {
 }
 
 /// Cancels a request that is still pending or accepted.
-Future<void> cancelRequest(String id) {
+Future<void> cancelRequest(String id) async {
   final ref = _requests.doc(id);
-  return FirebaseFirestore.instance.runTransaction((tx) async {
+  String? providerUid;
+  await FirebaseFirestore.instance.runTransaction((tx) async {
     final snap = await tx.get(ref);
     final status = snap.data()?['status'];
     if (status == 'pending' || status == 'accepted') {
-      tx.update(ref, {'status': 'cancelled'});
+      providerUid = snap.data()?['providerUid'] as String?;
+      tx.update(ref, {'status': 'cancelled', 'cancelledBy': 'customer'});
     }
   });
+  final p = providerUid;
+  if (p != null) {
+    await FirebaseFirestore.instance.collection('notifications').add({
+      'uid': p,
+      'title': 'Customer cancelled',
+      'body': 'The customer cancelled the request.',
+      'type': 'cancelled',
+      'requestId': id,
+      'read': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
 }
 
 /// Marks a still-pending request as expired (nobody accepted in time).
@@ -285,3 +314,101 @@ Stream<List<ServiceRequest>> watchPendingRequests(Set<ServiceType> services) {
             .toList(),
       );
 }
+
+// ============================================================
+// Nearby providers (for the live map on the searching screen)
+// ============================================================
+
+class NearbyProvider {
+  final String uid;
+  final GeoLocation location;
+  const NearbyProvider({required this.uid, required this.location});
+}
+
+/// Live list of available providers that offer [service], with their
+/// current location. Distance filtering happens on the device.
+///
+/// NOTE: this query may ask for a composite index on `users`
+/// (userType, isAvailable, services). Firestore prints a link to create it
+/// in the debug console the first time it runs.
+Stream<List<NearbyProvider>> watchNearbyProviders(ServiceType service) {
+  return FirebaseFirestore.instance
+      .collection('users')
+      .where('userType', isEqualTo: UserType.assistanceProvider.name)
+      .where('isAvailable', isEqualTo: true)
+      .where('services', arrayContains: service.name)
+      .snapshots()
+      .map((snap) {
+        final list = <NearbyProvider>[];
+        for (final d in snap.docs) {
+          final loc = GeoLocation.fromMap(
+            d.data()['currentLocation'] as Map<String, dynamic>?,
+          );
+          // Skip providers that haven't reported a location yet.
+          if (loc.latitude == 0 && loc.longitude == 0) continue;
+          
+          final updated = d.data()['locationUpdatedAt'];
+          if (updated is Timestamp &&
+              DateTime.now().difference(updated.toDate()) > const Duration(minutes: 3)) {
+            continue; // provider went silent (app killed / no signal)
+          }
+          
+          list.add(NearbyProvider(uid: d.id, location: loc));
+        }
+        return list;
+      });
+}
+
+const Set<RequestStatus> kActiveStatuses = {
+  RequestStatus.accepted,
+  RequestStatus.onTheWay,
+  RequestStatus.arrived,
+  RequestStatus.inProgress,
+};
+
+/// All jobs a provider has taken, newest first (sorted on the device so no
+/// composite index is needed).
+Stream<List<ServiceRequest>> watchProviderJobs(String providerUid) {
+  return _requests
+      .where('providerUid', isEqualTo: providerUid)
+      .snapshots()
+      .map((snap) {
+        final list = snap.docs
+            .map((d) => ServiceRequest.fromMap(d.id, d.data()))
+            .toList();
+        list.sort((a, b) => (b.createdAt ?? DateTime.now())
+            .compareTo(a.createdAt ?? DateTime.now()));
+        return list;
+      });
+}
+
+const Map<RequestStatus, Set<RequestStatus>> _allowedNext = {
+  RequestStatus.accepted: {RequestStatus.onTheWay, RequestStatus.cancelled},
+  RequestStatus.onTheWay: {RequestStatus.arrived, RequestStatus.cancelled},
+  RequestStatus.arrived: {RequestStatus.inProgress, RequestStatus.cancelled},
+  RequestStatus.inProgress: {RequestStatus.completed},
+};
+
+/// Provider moves a job forward. Only the provider who owns the job can do it
+/// and only along the allowed path. Returns false if it was refused.
+Future<bool> updateJobStatus({
+  required String requestId,
+  required String providerUid,
+  required RequestStatus next,
+}) {
+  final ref = _requests.doc(requestId);
+  return FirebaseFirestore.instance.runTransaction((tx) async {
+    final snap = await tx.get(ref);
+    final data = snap.data();
+    if (data == null || data['providerUid'] != providerUid) return false;
+    final current = _statusFromString(data['status'] as String?);
+    if (!(_allowedNext[current]?.contains(next) ?? false)) return false;
+    tx.update(ref, {
+      'status': next.name,
+      '${next.name}At': FieldValue.serverTimestamp(), // completedAt, cancelledAt...
+      if (next == RequestStatus.cancelled) 'cancelledBy': 'provider',
+    });
+    return true;
+  });
+}
+

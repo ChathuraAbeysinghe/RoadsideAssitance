@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../../../entities/app_user.dart';
 import '../../home/home_page.dart';
+import '../../more/more_page.dart';
 import '../../service_provider/screens/provider_home_page.dart';
-import '../../service_provider/screens/provider_profile_page.dart';
+import '../../service_provider/screens/provider_jobs_page.dart';
 import '../../service_provider/screens/provider_services_page.dart';
 import '../../vehicles/vehicle_list_page.dart';
 
@@ -37,6 +38,9 @@ class _NavTab {
 ///
 /// // On VehicleListPage's build():
 /// AppBottomNavBar(userType: userType, activeIndex: 2),
+///
+/// // On MorePage's build():
+/// AppBottomNavBar(userType: userType, activeIndex: 3),
 /// ```
 ///
 /// Tapping the already-active tab does nothing (no duplicate page push).
@@ -76,7 +80,7 @@ class AppBottomNavBar extends StatelessWidget {
       activeIconAssetPath: 'assets/images/clipboard2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? const HomePage(userType: UserType.driver)
-          : const ProviderHomePage(userType: UserType.assistanceProvider),
+          : const ProviderJobsPage(),
     ),
     _NavTab(
       label: userType == UserType.driver ? 'Vehicle' : 'Services',
@@ -90,9 +94,7 @@ class AppBottomNavBar extends StatelessWidget {
       label: 'More',
       inactiveIconAssetPath: 'assets/images/application1.png',
       activeIconAssetPath: 'assets/images/application2.png',
-      destinationBuilder: (_) => userType == UserType.driver
-          ? const HomePage(userType: UserType.driver)
-          : const ProviderProfilePage(),
+      destinationBuilder: (_) => MorePage(userType: userType),
     ),
   ];
 

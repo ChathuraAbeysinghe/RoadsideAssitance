@@ -8,10 +8,13 @@ import 'features/auth/screens/welcome_page.dart';
 import 'features/home/home_page.dart';
 import 'features/service_provider/screens/provider_home_page.dart';
 import 'firebase_options.dart';
+import 'services/provider_location_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Shares an available provider's live location, whatever page is open.
+  ProviderLocationService.instance.autoManage();
   runApp(const MyApp());
 }
 
