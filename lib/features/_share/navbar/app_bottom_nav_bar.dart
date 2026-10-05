@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../entities/app_user.dart';
 import '../../home/home_page.dart';
 import '../../more/more_page.dart';
+import '../../requests/requests_page.dart';
 import '../../service_provider/screens/provider_home_page.dart';
 import '../../service_provider/screens/provider_jobs_page.dart';
 import '../../service_provider/screens/provider_services_page.dart';
@@ -79,7 +80,7 @@ class AppBottomNavBar extends StatelessWidget {
       inactiveIconAssetPath: 'assets/images/clipboard1.png',
       activeIconAssetPath: 'assets/images/clipboard2.png',
       destinationBuilder: (_) => userType == UserType.driver
-          ? const HomePage(userType: UserType.driver)
+          ? RequestsPage(userType: userType)
           : const ProviderJobsPage(),
     ),
     _NavTab(
@@ -88,7 +89,10 @@ class AppBottomNavBar extends StatelessWidget {
       activeIconAssetPath: 'assets/images/wheel2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? VehicleListPage(uid: _uid)
-          : ProviderServicesPage(uid: _uid, userType: UserType.assistanceProvider),
+          : ProviderServicesPage(
+              uid: _uid,
+              userType: UserType.assistanceProvider,
+            ),
     ),
     _NavTab(
       label: 'More',
