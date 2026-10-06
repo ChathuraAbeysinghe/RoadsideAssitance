@@ -46,6 +46,7 @@ class RequestSummaryPage extends StatefulWidget {
   final double? distanceKm;
   final int? durationMin;
   final Vehicle? vehicle;
+  final double searchRadiusKm;
 
   const RequestSummaryPage({
     super.key,
@@ -60,6 +61,7 @@ class RequestSummaryPage extends StatefulWidget {
     this.distanceKm,
     this.durationMin,
     this.vehicle,
+    this.searchRadiusKm = 5.0,
   });
 
   @override
@@ -803,7 +805,7 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
         fuelCost: _fuelCost,
         totalAmount: _totalAmount,
         paymentMethod: _paymentMethod.name,
-        searchRadiusKm: kSearchRadiiKm.first,
+        searchRadiusKm: widget.searchRadiusKm,
         expiresAt: DateTime.now().add(kSearchTimeout),
       );
 

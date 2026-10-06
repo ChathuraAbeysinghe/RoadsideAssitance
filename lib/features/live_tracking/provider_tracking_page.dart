@@ -6,15 +6,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../entities/app_user.dart';
 import '../../entities/service_request.dart';
 import '../../services/tracking_registry.dart';
 
 const Color _brandRed = Color(0xFFE30613);
+const Color _success = Color(0xFF22C55E);
 const String _assistanceIcon = 'assets/images/assistance1.png';
 const String _pickupPinPath = 'assets/images/pickup-point.png';
 const String _appPackageName = 'com.example.roadside_assitance';
+
+/// Contact button icons (same files as the driver tracking page).
+const String _messageIcon = 'assets/images/message.png';
+const String _callIcon = 'assets/images/call.png';
 
 /// The map is laid out 30px taller than what's visible (it extends under the
 /// sheet), hence the larger bottom padding.
@@ -225,21 +231,59 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel this job?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Text(
+          'Cancel this job?',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         content: const Text('The driver will be told that you cancelled.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Keep job'),
+            child: const Text(
+              'Keep job',
+              style: TextStyle(color: Colors.black87),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Cancel job', style: TextStyle(color: _brandRed)),
+            child: const Text(
+              'Cancel job',
+              style: TextStyle(color: _brandRed, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
     );
     if (confirm == true) _advance(RequestStatus.cancelled);
+  }
+
+  Future<void> _callDriver() async {
+    final phone = _driver?.phoneNumber ?? '';
+    if (phone.isEmpty) {
+      _snack('Phone number not available');
+      return;
+    }
+    try {
+      if (!await launchUrl(Uri(scheme: 'tel', path: phone))) {
+        _snack('Could not open the dialer');
+      }
+    } catch (_) {
+      _snack('Could not open the dialer');
+    }
+  }
+
+  /// Opens the phone's messaging app with a new message to the driver.
+  Future<void> _messageDriver() async {
+    final phone = _driver?.phoneNumber ?? '';
+    if (phone.isEmpty) return;
+    try {
+      if (!await launchUrl(Uri(scheme: 'sms', path: phone))) {
+        _snack('Could not open messages');
+      }
+    } catch (_) {
+      _snack('Could not open messages');
+    }
   }
 
   // ---------------- UI ----------------
@@ -279,15 +323,17 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                     child: Material(
                       color: Colors.white,
                       shape: const CircleBorder(),
-                      elevation: 3,
+                      elevation: 4,
+                      shadowColor: Colors.black38,
                       child: InkWell(
                         customBorder: const CircleBorder(),
                         onTap: _back,
                         child: const SizedBox(
-                          width: 40,
-                          height: 40,
+                          width: 42,
+                          height: 42,
                           child: Icon(
-                            Icons.chevron_left,
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 18,
                             color: Colors.black87,
                           ),
                         ),
@@ -305,7 +351,10 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                         horizontal: 6,
                         vertical: 2,
                       ),
-                      color: Colors.white.withValues(alpha: 0.75),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                       child: const Text(
                         '© OpenStreetMap contributors',
                         style: TextStyle(fontSize: 10, color: Colors.black87),
@@ -395,7 +444,7 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                 alignment: Alignment.topCenter,
                 child: const Icon(
                   Icons.location_on,
-                  color: Colors.black,
+                  color: Color.fromARGB(255, 210, 0, 0),
                   size: 40,
                 ),
               ),
@@ -438,6 +487,7 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
     );
   }
 
+  // ---------------- bottom sheet ----------------
   Widget _buildSheet() {
     final bottomInset = MediaQuery.of(context).padding.bottom;
     return ConstrainedBox(
@@ -446,50 +496,369 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
       ),
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + bottomInset),
+        padding: EdgeInsets.fromLTRB(0, 10, 0, 14 + bottomInset),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 15,
-              offset: const Offset(0, -3),
+              color: Colors.black.withValues(alpha: 0.14),
+              blurRadius: 18,
+              offset: const Offset(0, -4),
             ),
           ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(3),
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(3),
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            _buildStatus(),
-            const SizedBox(height: 14),
             // Only the details scroll; the buttons stay visible.
             Flexible(
               child: SingleChildScrollView(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildDriverCard(),
-                    const SizedBox(height: 12),
+                    _buildCombinedCard(),
                     _buildDetails(),
+                    _buildCancelLink(),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            _buildActions(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: _buildActions(),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  /// One card with driver details, fare and status/progress.
+  Widget _buildCombinedCard() {
+    return ColoredBox(
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildDriverCard(),
+          _buildFareStrip(),
+          Container(height: 1, color: Colors.grey.shade200),
+          _buildStatusContent(),
+        ],
+      ),
+    );
+  }
+
+  // ---- driver ----
+  /// Driver card: avatar, name, role, rating, vehicle, contact buttons.
+  Widget _buildDriverCard() {
+    final user = _driver;
+    final r = _r;
+
+    // Loading skeleton
+    if (user == null || r == null) {
+      return const SizedBox(
+        height: 120,
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _brandRed),
+          ),
+        ),
+      );
+    }
+
+    final hasPhoto = user.profileImagePath.isNotEmpty;
+    final rating = user.rating;
+    final vehicleName = r.vehicleLabel ?? '';
+    final canContact = user.phoneNumber.isNotEmpty && !_finished;
+    final isLive = !_finished;
+
+    final fallbackAvatar = ColoredBox(
+      color: Colors.grey.shade200,
+      child: Icon(Icons.person_rounded, size: 34, color: Colors.grey.shade500),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  SizedBox(
+                    width: 68,
+                    height: 68,
+                    child: ClipOval(
+                      child: hasPhoto
+                          ? Image.network(
+                              user.profileImagePath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => fallbackAvatar,
+                              loadingBuilder: (context, child, progress) =>
+                                  progress == null ? child : fallbackAvatar,
+                            )
+                          : fallbackAvatar,
+                    ),
+                  ),
+                  if (isLive)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: _success,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.name.isEmpty ? 'Driver' : user.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Driver',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            size: 15,
+                            color: Colors.black87,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            rating.count > 0
+                                ? '${rating.average.toStringAsFixed(1)} (${rating.count})'
+                                : 'New driver',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (canContact) ...[
+                const SizedBox(width: 8),
+                _contactButton(
+                  _messageIcon,
+                  Icons.chat_bubble_rounded,
+                  _messageDriver,
+                ),
+                const SizedBox(width: 8),
+                _contactButton(_callIcon, Icons.phone_rounded, _callDriver),
+              ],
+            ],
+          ),
+
+          // Vehicle strip
+          if (vehicleName.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Vehicle',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                        Text(
+                          vehicleName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Simple round icon button used for Message / Call (neutral colors).
+  Widget _contactButton(String asset, IconData fallback, VoidCallback onTap) {
+    return Material(
+      color: Colors.grey.shade100,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Image.asset(
+              asset,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) =>
+                  Icon(fallback, size: 20, color: Colors.black87),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---- fare ----
+  /// Fare strip: service type + payment method left, fare right.
+  Widget _buildFareStrip() {
+    final r = _r;
+    if (r == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  serviceTypeTitle(r.serviceType),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.payments_outlined,
+                      size: 13,
+                      color: Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      r.paymentMethod == 'cash' ? 'Cash in Person' : 'Card',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'TOTAL FARE',
+                style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 0.8,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'LKR ${_formatAmount(r.totalAmount)}',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatAmount(double v) {
+    final s = v.toStringAsFixed(0);
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
   }
 
   // ---- status ----
@@ -507,7 +876,8 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
     RequestStatus.expired => 'Request expired',
   };
 
-  Widget _buildStatus() {
+  /// Status header: title, distance and a progress tracker.
+  Widget _buildStatusContent() {
     final me = _me;
     final toDropoff = _status == RequestStatus.inProgress && _dropoff != null;
     final showDistance =
@@ -519,218 +889,206 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
         ? null
         : const Distance().as(LengthUnit.Kilometer, me, _target);
 
-    return Column(
-      children: [
-        Text(
-          _statusTitle(_status),
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-        ),
-        if (showDistance && km != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            '${km.toStringAsFixed(1)} km to ${toDropoff ? 'drop-off' : 'the driver'}',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _statusTitle(_status),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                        height: 1.2,
+                      ),
+                    ),
+                    if (showDistance && km != null) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.near_me_rounded,
+                            size: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${km.toStringAsFixed(1)} km to ${toDropoff ? 'drop-off' : 'the driver'}',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              _buildTripInfo(),
+            ],
           ),
+          _buildProgress(),
         ],
-      ],
+      ),
     );
   }
 
-  // ---- driver ----
-  Widget _buildDriverCard() {
-    final user = _driver;
-    final fallbackAvatar = ColoredBox(
-      color: Colors.grey.shade300,
-      child: Icon(Icons.person, color: Colors.grey.shade600),
-    );
-
-    if (user == null) {
-      return const SizedBox(
-        height: 60,
-        child: Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
+  /// Trip distance and duration, shown on the right of the status header.
+  Widget _buildTripInfo() {
+    final r = _r;
+    if (r == null || (r.distanceKm == null && r.durationMin == null)) {
+      return const SizedBox.shrink();
     }
-
-    final rating = user.rating;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade400),
-      ),
-      child: Row(
+    return Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          ClipOval(
-            child: SizedBox(
-              width: 54,
-              height: 54,
-              child: user.profileImagePath.isNotEmpty
-                  ? Image.network(
-                      user.profileImagePath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => fallbackAvatar,
-                      loadingBuilder: (context, child, progress) =>
-                          progress == null ? child : fallbackAvatar,
-                    )
-                  : fallbackAvatar,
+          if (r.distanceKm != null)
+            Text(
+              '${r.distanceKm!.toStringAsFixed(1)} km',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Colors.black87,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Driver',
-                  style: TextStyle(fontSize: 11, color: Colors.black54),
-                ),
-                Text(
-                  user.name.isEmpty ? 'Driver' : user.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+          if (r.durationMin != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              '${r.durationMin} min',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 4-step progress tracker (hidden for pending / cancelled / expired).
+  Widget _buildProgress() {
+    final idx = switch (_status) {
+      RequestStatus.accepted => 0,
+      RequestStatus.onTheWay => 1,
+      RequestStatus.arrived => 2,
+      RequestStatus.inProgress => 3,
+      RequestStatus.completed => 4,
+      _ => -1,
+    };
+    if (idx < 0) return const SizedBox.shrink();
+
+    const labels = ['Accepted', 'On the way', 'Arrived', 'Service'];
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Row(
+        children: List.generate(labels.length, (i) {
+          final done = i <= idx;
+          final current = i == idx;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(right: i == labels.length - 1 ? 0 : 5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: done
+                          ? (idx == 4 ? _success : _brandRed)
+                          : Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
-                ),
-                if (user.phoneNumber.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Icon(Icons.phone, size: 14, color: Colors.grey.shade700),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          user.phoneNumber,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 6),
+                  Text(
+                    labels[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: current ? FontWeight.w800 : FontWeight.w500,
+                      color: done ? Colors.black87 : Colors.grey.shade500,
+                    ),
                   ),
                 ],
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    const Icon(Icons.star, size: 16, color: Colors.amber),
-                    const SizedBox(width: 3),
-                    Text(
-                      rating.count > 0
-                          ? '${rating.average.toStringAsFixed(1)} (${rating.count})'
-                          : 'No ratings yet',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+          );
+        }),
       ),
     );
   }
 
   // ---- request details ----
-  String _formatTime(DateTime d) {
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${d.year}-${two(d.month)}-${two(d.day)} ${two(d.hour)}:${two(d.minute)}';
-  }
+  String _money(double v) => 'LKR ${_formatAmount(v)}';
 
-  String _money(double v) => 'Rs: ${v.toStringAsFixed(2)}';
-
+  /// Remaining request details (pickup, drop-off, fuel, notes, fuel cost).
   Widget _buildDetails() {
     final r = _r!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _infoRow(
-          Icons.build_circle_outlined,
-          'Service',
-          serviceTypeTitle(r.serviceType),
-        ),
-        _infoRow(Icons.location_on_outlined, 'Pickup', r.pickupAddress),
-        if (r.dropoffAddress != null && r.dropoffAddress!.isNotEmpty)
-          _infoRow(Icons.flag_outlined, 'Drop-off', r.dropoffAddress!),
-        if (r.distanceKm != null || r.durationMin != null)
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           _infoRow(
-            Icons.route_outlined,
-            'Trip',
-            [
-              if (r.distanceKm != null)
-                '${r.distanceKm!.toStringAsFixed(1)} km',
-              if (r.durationMin != null) '${r.durationMin} min',
-            ].join(' · '),
+            Icons.location_on_outlined,
+            'Pickup',
+            r.pickupAddress,
+            maxLines: 2,
           ),
-        if (r.vehicleLabel != null)
-          _infoRow(Icons.directions_car_outlined, 'Vehicle', r.vehicleLabel!),
-        if (r.liters != null)
-          _infoRow(
-            Icons.local_gas_station_outlined,
-            'Fuel',
-            '${r.liters} L · ${r.fuelType ?? ''}'.trim(),
-          ),
-        if (r.notes.isNotEmpty)
-          _infoRow(Icons.note_alt_outlined, 'Notes', r.notes),
-        const SizedBox(height: 4),
-        Divider(height: 1, color: Colors.grey.shade300),
-        const SizedBox(height: 4),
-        _infoRow(
-          Icons.receipt_long_outlined,
-          'Service fee',
-          _money(r.serviceFee),
-        ),
-        if (r.fuelCost > 0)
-          _infoRow(
-            Icons.local_gas_station_outlined,
-            'Fuel cost',
-            _money(r.fuelCost),
-          ),
-        _infoRow(Icons.payments_outlined, 'Total', _money(r.totalAmount)),
-        _infoRow(
-          Icons.account_balance_wallet_outlined,
-          'Payment',
-          r.paymentMethod == 'cash' ? 'Cash in Person' : 'Card',
-        ),
-        if (r.createdAt != null)
-          _infoRow(
-            Icons.schedule_outlined,
-            'Requested',
-            _formatTime(r.createdAt!),
-          ),
-        if (r.acceptedAt != null)
-          _infoRow(
-            Icons.check_circle_outline,
-            'Accepted',
-            _formatTime(r.acceptedAt!),
-          ),
-        if (r.completedAt != null)
-          _infoRow(Icons.done_all, 'Completed', _formatTime(r.completedAt!)),
-      ],
+          if (r.dropoffAddress != null && r.dropoffAddress!.isNotEmpty)
+            _infoRow(
+              Icons.flag_outlined,
+              'Drop-off',
+              r.dropoffAddress!,
+              maxLines: 2,
+            ),
+          if (r.liters != null)
+            _infoRow(
+              Icons.local_gas_station_outlined,
+              'Fuel',
+              '${r.liters} L · ${r.fuelType ?? ''}'.trim(),
+            ),
+          if (r.notes.isNotEmpty)
+            _infoRow(Icons.note_alt_outlined, 'Notes', r.notes),
+          if (r.fuelCost > 0)
+            _infoRow(
+              Icons.local_gas_station_outlined,
+              'Fuel cost',
+              _money(r.fuelCost),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _infoRow(IconData icon, String label, String value) {
+  Widget _infoRow(IconData icon, String label, String value, {int? maxLines}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Colors.black54),
+          Icon(icon, size: 18, color: Colors.black54),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -738,13 +1096,15 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                 ),
                 const SizedBox(height: 1),
                 Text(
                   value,
+                  maxLines: maxLines,
+                  overflow: maxLines == null ? null : TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -775,51 +1135,66 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
   Widget _buildActions() {
     final step = _nextStep;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            onPressed: _busy
-                ? null
-                : (step == null ? _back : () => _advance(step.$2)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _brandRed,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _busy
+                  ? null
+                  : (step == null ? _back : () => _advance(step.$2)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _brandRed,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: _brandRed.withValues(alpha: 0.6),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
               ),
+              child: _busy
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : Text(
+                      step?.$1 ?? 'Done',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
-            child: _busy
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
-                    ),
-                  )
-                : Text(
-                    step?.$1 ?? 'Done',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Small red text at the very bottom of the scrollable content.
+  Widget _buildCancelLink() {
+    if (!_canCancel) return const SizedBox.shrink();
+    return Center(
+      child: TextButton(
+        onPressed: _busy ? null : _confirmCancel,
+        style: TextButton.styleFrom(
+          foregroundColor: _brandRed,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
-        if (_canCancel)
-          TextButton(
-            onPressed: _busy ? null : _confirmCancel,
-            child: const Text(
-              'Cancel job',
-              style: TextStyle(color: Colors.black87),
-            ),
-          ),
-      ],
+        child: const Text(
+          'Cancel job',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+      ),
     );
   }
 }
