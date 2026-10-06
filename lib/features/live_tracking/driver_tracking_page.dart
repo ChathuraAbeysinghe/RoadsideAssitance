@@ -17,7 +17,15 @@ import '../../services/customer_location_sharer.dart';
 import '../../services/tracking_registry.dart';
 
 const Color _brandRed = Color(0xFFE30613);
-const String _assistanceIcon = 'assets/images/assistance1.png';
+
+/// Top-down vehicle image.
+const String _providerVehicleIcon = 'assets/images/top-vehicle.png';
+
+/// Which way the image itself points, in degrees clockwise from "up":
+/// 0 = front of the vehicle faces the top of the image, 90 = faces right,
+/// 180 = faces down, 270 = faces left. Change this if the icon turns the
+/// wrong way relative to the direction of travel.
+const double _vehicleIconFacing = 0;
 const String _appPackageName = 'com.example.roadside_assitance';
 const String _userAgent = 'RoadsideAssistance/1.0 (kavidupurnamal@gmail.com)';
 
@@ -112,6 +120,11 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
   ServiceRequest? _request;
   AppUser? _provider;
   LatLng? _providerLoc;
+  // Direction the provider is heading, degrees clockwise from north.
+  // [_providerTurns] is the unwrapped (continuous) version used for animation
+  // so the icon always turns the short way round.
+  double _providerHeading = 0;
+  double _providerTurns = 0;
   Vehicle? _providerVehicle;
   bool _vehicleRequested = false;
 
@@ -302,9 +315,34 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
     );
     final hasLoc = loc.latitude != 0 || loc.longitude != 0;
 
+    // Optional heading written by the provider app (degrees, 0 = north).
+    // Falls back to the bearing between the last two positions.
+    final rawHeading =
+        (data['currentLocation'] as Map<String, dynamic>?)?['heading'] ??
+        data['heading'];
+
     setState(() {
       _provider = user ?? _provider;
-      if (hasLoc) _providerLoc = LatLng(loc.latitude, loc.longitude);
+      if (hasLoc) {
+        final next = LatLng(loc.latitude, loc.longitude);
+        final prev = _providerLoc;
+        double? heading;
+        if (prev != null &&
+            const Distance().as(LengthUnit.Meter, prev, next) >= 2) {
+          // Real movement is the most reliable source. Tiny jumps are
+          // ignored: GPS noise would make the icon spin.
+          heading = _bearing(prev, next);
+        } else if (rawHeading is num && rawHeading > 0 && rawHeading <= 360) {
+          // Provider-app heading. 0 / -1 usually means "unknown" in
+          // Geolocator, so those values are not trusted.
+          heading = rawHeading.toDouble();
+        } else if (prev == null) {
+          // First fix: face the destination until the provider starts moving.
+          heading = _bearing(next, _routeTarget);
+        }
+        if (heading != null) _setProviderHeading(heading);
+        _providerLoc = next;
+      }
     });
 
     if (user != null && !_vehicleRequested) {
@@ -323,6 +361,27 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
         DateTime.now().difference(_lastGesture) > const Duration(seconds: 5)) {
       _fitAll();
     }
+  }
+
+  /// Initial compass bearing from [a] to [b], 0-360 degrees.
+  static double _bearing(LatLng a, LatLng b) {
+    final lat1 = a.latitudeInRad;
+    final lat2 = b.latitudeInRad;
+    final dLng = b.longitudeInRad - a.longitudeInRad;
+    final y = math.sin(dLng) * math.cos(lat2);
+    final x =
+        math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(dLng);
+    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+  }
+
+  /// Stores the new heading and keeps [_providerTurns] continuous by moving
+  /// along the shortest arc from the previous heading.
+  void _setProviderHeading(double heading) {
+    var delta = (heading - _providerHeading) % 360;
+    if (delta > 180) delta -= 360;
+    _providerHeading = heading;
+    _providerTurns += delta / 360;
   }
 
   Future<void> _loadProviderVehicle(AppUser user) async {
@@ -588,15 +647,21 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
             if (provider != null)
               Marker(
                 point: provider,
-                width: 40,
-                height: 40,
-                child: Image.asset(
-                  _assistanceIcon,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.local_shipping,
-                    color: _brandRed,
-                    size: 30,
+                width: 50,
+                height: 50,
+                // Top-down vehicle that turns to face its direction of travel.
+                child: AnimatedRotation(
+                  turns: _providerTurns - _vehicleIconFacing / 360,
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOut,
+                  child: Image.asset(
+                    _providerVehicleIcon,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.local_shipping,
+                      color: _brandRed,
+                      size: 30,
+                    ),
                   ),
                 ),
               ),
