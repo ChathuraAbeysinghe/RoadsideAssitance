@@ -102,19 +102,19 @@ const String _userAgent = 'RoadsideAssistance/1.0 (kavidupurnamal@gmail.com)';
 
 const String _appPackageName = 'com.example.roadside_assitance';
 
-class _RouteResult {
+class RouteResult {
   final List<LatLng> points;
   final double distanceMeters;
   final double durationSeconds;
 
-  const _RouteResult({
+  const RouteResult({
     required this.points,
     required this.distanceMeters,
     required this.durationSeconds,
   });
 }
 
-class _MapApi {
+class MapApi {
   static Future<LatLng?> geocode(String query) async {
     try {
       final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
@@ -152,7 +152,7 @@ class _MapApi {
     }
   }
 
-  static Future<_RouteResult?> route(LatLng a, LatLng b) async {
+  static Future<RouteResult?> route(LatLng a, LatLng b) async {
     try {
       // OSRM expects longitude,latitude order.
       final uri = Uri.parse(
@@ -167,7 +167,7 @@ class _MapApi {
       if (routes == null || routes.isEmpty) return null;
       final first = routes[0] as Map<String, dynamic>;
       final coords = first['geometry']['coordinates'] as List;
-      return _RouteResult(
+      return RouteResult(
         points: coords
             .map(
               (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
@@ -1472,7 +1472,7 @@ class _RequestServicePageState extends State<RequestServicePage>
     } else {
       controller.text =
           '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
-      final address = await _MapApi.reverseGeocode(point);
+      final address = await MapApi.reverseGeocode(point);
       if (!mounted) return;
       if (address != null) controller.text = address;
     }
@@ -1486,7 +1486,7 @@ class _RequestServicePageState extends State<RequestServicePage>
     if (a == null || b == null) return;
 
     setState(() => _loadingRoute = true);
-    final result = await _MapApi.route(a, b);
+    final result = await MapApi.route(a, b);
     if (!mounted) return;
 
     if (result == null) {
@@ -1522,7 +1522,7 @@ class _RequestServicePageState extends State<RequestServicePage>
     if (query.isEmpty) return;
     FocusScope.of(context).unfocus();
 
-    final point = await _MapApi.geocode(query);
+    final point = await MapApi.geocode(query);
     if (!mounted) return;
     if (point == null) {
       _snack('Location not found. Try a more specific address.');
