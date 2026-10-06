@@ -97,7 +97,11 @@ class _EmptyServices extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 0),
+          Image.asset(
+            'assets/icon/icon-add_service_emppage.png',
+            height: 120,
+          ),
+          const SizedBox(height: 20),
           const Text(
             'Your service will appear here',
             textAlign: TextAlign.center,
