@@ -265,6 +265,9 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
       final done = await _repo.setJobStatus(job, next);
       if (!done) _snack('Could not update the job. It may have changed.');
       if (done && next == RequestStatus.onTheWay) _fitted = false;
+      if (done && next == RequestStatus.completed) {
+        _showFinalSummary(job);
+      }
     } catch (_) {
       _snack('Could not update the job. Try again.');
     } finally {
@@ -294,6 +297,83 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     );
     if (ok != true) return;
     await _advance(job, RequestStatus.cancelled);
+  }
+
+  void _showFinalSummary(ServiceRequest job) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(
+                child: Icon(Icons.check_circle, color: Colors.green, size: 72),
+              ),
+              const SizedBox(height: 16),
+              const Center(
+                child: Text(
+                  'Service Completed!',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 32),
+              const Text('SERVICE DETAILS', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+              const SizedBox(height: 12),
+              _row(Icons.build_circle_outlined, serviceTypeTitle(job.serviceType)),
+              _row(Icons.location_on_outlined, job.pickupAddress),
+              if (job.dropoffAddress != null && job.dropoffAddress!.isNotEmpty)
+                _row(Icons.flag_outlined, 'Drop-off: ${job.dropoffAddress}'),
+              if (job.vehicleLabel != null)
+                _row(Icons.directions_car_outlined, job.vehicleLabel!),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Final Price', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(money(job.totalAmount), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _brandRed)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Payment Method', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  Text(job.paymentMethod == 'cash' ? 'Cash in person' : job.paymentMethod, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+                ],
+              ),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _brandRed,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('Done', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // ---------------- UI ----------------
