@@ -1034,6 +1034,13 @@ class JobHistoryTile extends StatelessWidget {
       ),
       color: Colors.white,
       child: ListTile(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ProviderJobPage(requestId: job.id),
+            ),
+          );
+        },
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
           padding: const EdgeInsets.all(10),
