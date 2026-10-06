@@ -27,6 +27,10 @@ const String _providerVehicleIcon = 'assets/images/top-vehicle.png';
 /// 180 = faces down, 270 = faces left. Change this if the icon turns the
 /// wrong way relative to the direction of travel.
 const double _vehicleIconFacing = 0;
+
+/// Contact button icons (add both files to pubspec.yaml assets).
+const String _messageIcon = 'assets/images/message.png';
+const String _callIcon = 'assets/images/call.png';
 const String _appPackageName = 'com.example.roadside_assitance';
 const String _userAgent = 'RoadsideAssistance/1.0 (kavidupurnamal@gmail.com)';
 
@@ -993,14 +997,10 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Container(
+                  // Plain circular photo, no ring.
+                  SizedBox(
                     width: 68,
                     height: 68,
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _brandRed, width: 2),
-                    ),
                     child: ClipOval(
                       child: hasPhoto
                           ? Image.network(
@@ -1015,8 +1015,8 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                   ),
                   if (isLive)
                     Positioned(
-                      right: 2,
-                      bottom: 2,
+                      right: 0,
+                      bottom: 0,
                       child: Container(
                         width: 16,
                         height: 16,
@@ -1091,13 +1091,13 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
               ),
               if (canContact) ...[
                 const SizedBox(width: 8),
-                _contactButton(Icons.chat_bubble_rounded, _messageProvider),
-                const SizedBox(width: 8),
                 _contactButton(
-                  Icons.phone_rounded,
-                  _callProvider,
-                  filled: true,
+                  _messageIcon,
+                  Icons.chat_bubble_rounded,
+                  _messageProvider,
                 ),
+                const SizedBox(width: 8),
+                _contactButton(_callIcon, Icons.phone_rounded, _callProvider),
               ],
             ],
           ),
@@ -1180,14 +1180,10 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
     );
   }
 
-  /// Simple round icon button used for Message / Call.
-  Widget _contactButton(
-    IconData icon,
-    VoidCallback onTap, {
-    bool filled = false,
-  }) {
+  /// Simple round icon button used for Message / Call (neutral colors).
+  Widget _contactButton(String asset, IconData fallback, VoidCallback onTap) {
     return Material(
-      color: filled ? _brandRed : Colors.grey.shade100,
+      color: Colors.grey.shade100,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
@@ -1195,7 +1191,15 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
         child: SizedBox(
           width: 42,
           height: 42,
-          child: Icon(icon, size: 20, color: filled ? Colors.white : _brandRed),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Image.asset(
+              asset,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) =>
+                  Icon(fallback, size: 20, color: Colors.black87),
+            ),
+          ),
         ),
       ),
     );
