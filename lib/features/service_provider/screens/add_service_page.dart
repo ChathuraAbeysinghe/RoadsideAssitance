@@ -61,14 +61,36 @@ class _AddServicePageState extends State<AddServicePage> {
   }
 
   Future<void> _save() async {
-    if (widget.uid.isEmpty ||
-        _name.text.trim().isEmpty ||
-        _plate.text.trim().isEmpty ||
-        _details.text.trim().isEmpty) {
+    bool isValid = widget.uid.isNotEmpty && _location.text.trim().isNotEmpty;
+    if (_type == ServiceType.towTruck) {
+      if (_vehicles.text.trim().isEmpty || _plate.text.trim().isEmpty) isValid = false;
+    } else if (_type == ServiceType.mechanic) {
+      if (_details.text.trim().isEmpty) isValid = false;
+    } else if (_type == ServiceType.fuelDelivery) {
+      if (_details.text.trim().isEmpty || _vehicles.text.trim().isEmpty || _plate.text.trim().isEmpty) isValid = false;
+    }
+
+    if (!isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all required fields')),
       );
       return;
+    }
+
+    if (_type == ServiceType.batteryBoost || _type == ServiceType.flatTireChange) {
+      _name.clear();
+      _vehicles.clear();
+      _plate.clear();
+      _details.clear();
+    } else if (_type == ServiceType.mechanic) {
+      _name.clear();
+      _vehicles.clear();
+      _plate.clear();
+    } else if (_type == ServiceType.towTruck) {
+      _name.clear();
+      _details.clear();
+    } else if (_type == ServiceType.fuelDelivery) {
+      _name.clear();
     }
     setState(() => _saving = true);
     try {
@@ -140,39 +162,7 @@ class _AddServicePageState extends State<AddServicePage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    _buildLabeledField(
-                      controller: _location,
-                      label: 'Location',
-                      hint: 'e.g. Colombo',
-                    ),
-                    const SizedBox(height: 14),
-                    _buildLabeledField(
-                      controller: _name,
-                      label: 'Your Name',
-                      hint: 'e.g. Nuwan Perera',
-                      isRequired: true,
-                    ),
-                    const SizedBox(height: 14),
-                    _buildLabeledField(
-                      controller: _vehicles,
-                      label: 'Truck Types',
-                      hint: 'e.g. Flatbed',
-                    ),
-                    const SizedBox(height: 14),
-                    _buildLabeledField(
-                      controller: _plate,
-                      label: 'Plate NO',
-                      hint: 'e.g. WP CAA-9081',
-                      isRequired: true,
-                    ),
-                    const SizedBox(height: 14),
-                    _buildLabeledField(
-                      controller: _details,
-                      label: 'Details',
-                      hint: 'Describe your service',
-                      isRequired: true,
-                      maxLines: 3,
-                    ),
+                    ..._buildDynamicFields(),
                     const SizedBox(height: 44),
                     SizedBox(
                       width: double.infinity,
@@ -239,6 +229,74 @@ class _AddServicePageState extends State<AddServicePage> {
         ],
       ),
     );
+  }
+
+  List<Widget> _buildDynamicFields() {
+    List<Widget> fields = [];
+
+    fields.add(
+      _buildLabeledField(
+        controller: _location,
+        label: 'Location',
+        hint: 'e.g. Colombo',
+        isRequired: true,
+      ),
+    );
+
+    if (_type == ServiceType.towTruck) {
+      fields.addAll([
+        const SizedBox(height: 14),
+        _buildLabeledField(
+          controller: _vehicles,
+          label: 'Towing Truck Type',
+          hint: 'e.g. Flatbed or Wheel-Lift',
+          isRequired: true,
+        ),
+        const SizedBox(height: 14),
+        _buildLabeledField(
+          controller: _plate,
+          label: 'Plate Number',
+          hint: 'e.g. WP CAA-9081',
+          isRequired: true,
+        ),
+      ]);
+    } else if (_type == ServiceType.mechanic) {
+      fields.addAll([
+        const SizedBox(height: 14),
+        _buildLabeledField(
+          controller: _details,
+          label: 'Number of Technicians/Mechanics',
+          hint: 'e.g. 2',
+          isRequired: true,
+        ),
+      ]);
+    } else if (_type == ServiceType.fuelDelivery) {
+      fields.addAll([
+        const SizedBox(height: 14),
+        _buildLabeledField(
+          controller: _details,
+          label: 'Fuel Quantity',
+          hint: 'e.g. 10 Liters',
+          isRequired: true,
+        ),
+        const SizedBox(height: 14),
+        _buildLabeledField(
+          controller: _vehicles,
+          label: 'Vehicle Type',
+          hint: 'e.g. Tanker',
+          isRequired: true,
+        ),
+        const SizedBox(height: 14),
+        _buildLabeledField(
+          controller: _plate,
+          label: 'Plate Number',
+          hint: 'e.g. WP CAA-9081',
+          isRequired: true,
+        ),
+      ]);
+    }
+
+    return fields;
   }
 
   Widget _buildTypeChips() {
