@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../entities/app_user.dart';
 import '../models/provider_service.dart';
 import '../services/provider_repository.dart';
 import '../../request_service/request_service.dart' show MapApi;
+import 'location_picker_page.dart';
 
 class AddServicePage extends StatefulWidget {
   final String uid;
@@ -21,6 +23,7 @@ class _AddServicePageState extends State<AddServicePage> {
   final _vehicles = TextEditingController();
   final _plate = TextEditingController();
   final _location = TextEditingController();
+  GeoLocation? _locationGeo;
   final _details = TextEditingController();
 
   static const _typeOrder = [
@@ -49,6 +52,7 @@ class _AddServicePageState extends State<AddServicePage> {
       _vehicles.text = s.vehicleTypes;
       _plate.text = s.plateNumber;
       _location.text = s.location;
+      _locationGeo = s.locationGeo;
       _details.text = s.details;
     }
   }
@@ -95,9 +99,9 @@ class _AddServicePageState extends State<AddServicePage> {
     }
     setState(() => _saving = true);
     
-    GeoLocation? locationGeo;
+    GeoLocation? locationGeo = _locationGeo;
     final locText = _location.text.trim();
-    if (locText.isNotEmpty) {
+    if (locText.isNotEmpty && locationGeo == null) {
       final latLng = await MapApi.geocode(locText);
       if (latLng != null) {
         locationGeo = GeoLocation(latitude: latLng.latitude, longitude: latLng.longitude);
@@ -253,6 +257,23 @@ class _AddServicePageState extends State<AddServicePage> {
         label: 'Location',
         hint: 'e.g. Colombo',
         isRequired: true,
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.map, color: Color(0xFFE30613)),
+          onPressed: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LocationPickerPage()),
+            );
+            if (result != null && result is Map) {
+              final LatLng latLng = result['latLng'];
+              final String addr = result['address'];
+              setState(() {
+                _location.text = addr;
+                _locationGeo = GeoLocation(latitude: latLng.latitude, longitude: latLng.longitude);
+              });
+            }
+          },
+        ),
       ),
     );
 
@@ -353,6 +374,7 @@ class _AddServicePageState extends State<AddServicePage> {
     bool isRequired = false,
     TextInputType? keyboardType,
     int maxLines = 1,
+    Widget? suffixIcon,
   }) {
     return TextField(
       controller: controller,
@@ -375,6 +397,7 @@ class _AddServicePageState extends State<AddServicePage> {
         floatingLabelBehavior: FloatingLabelBehavior.always,
         hintText: hint,
         hintStyle: TextStyle(color: Colors.grey.shade400),
+        suffixIcon: suffixIcon,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: Colors.grey.shade300),

@@ -277,7 +277,30 @@ class IncomingRequestListener {
   }
 
   Future<bool> _isNearby(ServiceRequest r) async {
-    final me = await _myPosition();
+    LatLng? me;
+    if (_uid != null) {
+      try {
+        final psSnap = await FirebaseFirestore.instance
+            .collection('providerServices')
+            .where('providerUid', isEqualTo: _uid)
+            .where('serviceType', isEqualTo: r.serviceType.name)
+            .where('isActive', isEqualTo: true)
+            .get();
+        if (psSnap.docs.isNotEmpty) {
+          final locMap = psSnap.docs.first.data()['locationGeo'] as Map<String, dynamic>?;
+          if (locMap != null) {
+            final lat = locMap['latitude'];
+            final lng = locMap['longitude'];
+            if (lat != null && lng != null && (lat != 0 || lng != 0)) {
+              me = LatLng((lat as num).toDouble(), (lng as num).toDouble());
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    
+    me ??= await _myPosition();
+    
     if (me == null) {
       _log('no position for this provider yet, skipping ${r.id}');
       return false;
