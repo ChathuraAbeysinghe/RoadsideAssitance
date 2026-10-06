@@ -17,7 +17,6 @@ import '../../services/customer_location_sharer.dart';
 import '../../services/tracking_registry.dart';
 
 const Color _brandRed = Color(0xFFE30613);
-const Color _ink = Color(0xFF111111);
 const Color _success = Color(0xFF22C55E);
 
 /// Top-down vehicle image.
@@ -713,11 +712,9 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              _buildStatusCard(),
-              const SizedBox(height: 14),
               _buildProviderCard(),
               const SizedBox(height: 14),
-              _buildFareCard(),
+              _buildStatusCard(),
               _buildActions(),
             ],
           ),
@@ -740,27 +737,9 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
     RequestStatus.expired => 'Request Expired',
   };
 
-  IconData _statusIcon(RequestStatus s) => switch (s) {
-    RequestStatus.pending => Icons.hourglass_top_rounded,
-    RequestStatus.accepted => Icons.check_circle_rounded,
-    RequestStatus.onTheWay => Icons.directions_car_filled_rounded,
-    RequestStatus.arrived => Icons.flag_rounded,
-    RequestStatus.inProgress => Icons.build_circle_rounded,
-    RequestStatus.completed => Icons.verified_rounded,
-    RequestStatus.cancelled => Icons.cancel_rounded,
-    RequestStatus.expired => Icons.timer_off_rounded,
-  };
-
-  Color _statusColor(RequestStatus s) => switch (s) {
-    RequestStatus.completed => _success,
-    RequestStatus.cancelled || RequestStatus.expired => Colors.grey.shade600,
-    _ => _brandRed,
-  };
-
   /// Status header: icon, title, distance, ETA and a progress tracker.
-  Widget _buildStatusCard() {
+  Widget _buildStatusContent() {
     final p = _routeFrom;
-    final color = _statusColor(_status);
     String? etaValue;
     String? sub;
     if (_routeRelevant && p != null) {
@@ -774,33 +753,12 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
       }
     }
 
-    return Container(
+    return Padding(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Column(
         children: [
           Row(
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(_statusIcon(_status), color: color, size: 26),
-              ),
-              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -886,6 +844,28 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
           ),
           _buildProgress(),
         ],
+      ),
+    );
+  }
+
+  /// Status + fare combined: white status section with a red fare strip.
+  Widget _buildStatusCard() {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [_buildStatusContent(), _buildFareStrip()],
       ),
     );
   }
@@ -985,7 +965,6 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
         : '${vehicle.make} ${vehicle.model}'.trim();
     final hasPhone = user.phoneNumber.isNotEmpty;
     final canContact = hasPhone && kActiveStatuses.contains(_status);
-    final firstName = user.name.trim().split(' ').first;
     final isLive = kActiveStatuses.contains(_status);
 
     final fallbackAvatar = ColoredBox(
@@ -1110,6 +1089,16 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                   ],
                 ),
               ),
+              if (canContact) ...[
+                const SizedBox(width: 8),
+                _contactButton(Icons.chat_bubble_rounded, _messageProvider),
+                const SizedBox(width: 8),
+                _contactButton(
+                  Icons.phone_rounded,
+                  _callProvider,
+                  filled: true,
+                ),
+              ],
             ],
           ),
 
@@ -1186,98 +1175,42 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
               ),
             ),
           ],
-
-          // Contact buttons
-          if (canContact) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: Material(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(30),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(30),
-                      onTap: _messageProvider,
-                      child: SizedBox(
-                        height: 48,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.chat_bubble_rounded,
-                              size: 18,
-                              color: _brandRed,
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                firstName.isEmpty
-                                    ? 'Message'
-                                    : 'Message $firstName',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade800,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: _brandRed.withValues(alpha: 0.35),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: _brandRed,
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: _callProvider,
-                      child: const SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: Icon(
-                          Icons.phone_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
   }
 
-  /// Dark fare card: service type + payment method on the left, fare right.
-  Widget _buildFareCard() {
+  /// Simple round icon button used for Message / Call.
+  Widget _contactButton(
+    IconData icon,
+    VoidCallback onTap, {
+    bool filled = false,
+  }) {
+    return Material(
+      color: filled ? _brandRed : Colors.grey.shade100,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(icon, size: 20, color: filled ? Colors.white : _brandRed),
+        ),
+      ),
+    );
+  }
+
+  /// Fare strip: service type + payment method left, fare right.
+  Widget _buildFareStrip() {
     final r = _request;
     if (r == null) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: _ink,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
       ),
       child: Row(
         children: [
@@ -1285,13 +1218,13 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
+              color: _brandRed.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
               Icons.handyman_rounded,
               size: 20,
-              color: Colors.white,
+              color: _brandRed,
             ),
           ),
           const SizedBox(width: 12),
@@ -1306,7 +1239,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -1315,14 +1248,14 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                     Icon(
                       Icons.payments_outlined,
                       size: 13,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: Colors.grey.shade600,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       'Cash in Person',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: Colors.grey.shade600,
                       ),
                     ),
                   ],
@@ -1338,7 +1271,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 0.8,
-                  color: Colors.white.withValues(alpha: 0.55),
+                  color: Colors.grey.shade600,
                 ),
               ),
               const SizedBox(height: 2),
@@ -1347,7 +1280,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  color: Colors.black87,
                 ),
               ),
             ],
