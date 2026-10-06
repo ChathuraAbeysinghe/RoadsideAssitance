@@ -15,6 +15,7 @@ import 'provider_job_page.dart';
 import 'provider_jobs_page.dart';
 import 'provider_notifications_page.dart';
 import 'provider_ui_helpers.dart';
+import '../models/provider_service.dart';
 
 const Color _brandRed = Color(0xFFE30613);
 
@@ -526,11 +527,13 @@ class _PendingSectionState extends State<_PendingSection> {
   // Cached so the Firestore listener isn't recreated on every rebuild
   // (the provider doc changes every few seconds with the GPS updates).
   late Stream<List<ServiceRequest>> _stream;
+  late Stream<List<ProviderService>> _servicesStream;
 
   @override
   void initState() {
     super.initState();
     _stream = watchPendingRequests(widget.provider.services);
+    _servicesStream = ProviderRepository().watchServices(widget.provider.uid);
   }
 
   @override
@@ -538,6 +541,9 @@ class _PendingSectionState extends State<_PendingSection> {
     super.didUpdateWidget(old);
     if (!setEquals(old.provider.services, widget.provider.services)) {
       _stream = watchPendingRequests(widget.provider.services);
+    }
+    if (old.provider.uid != widget.provider.uid) {
+      _servicesStream = ProviderRepository().watchServices(widget.provider.uid);
     }
   }
 
@@ -612,60 +618,77 @@ class _PendingSectionState extends State<_PendingSection> {
     }
     final here = LatLng(loc.latitude, loc.longitude);
 
-    return StreamBuilder<List<ServiceRequest>>(
-      stream: _stream,
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return _info(
-            Icons.error_outline,
-            'Unable to load requests',
-            'Check your connection and try again.',
-          );
-        }
-        if (!snap.hasData) {
-          return const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
+    return StreamBuilder<List<ProviderService>>(
+      stream: _servicesStream,
+      builder: (context, servicesSnap) {
+        final myServices = servicesSnap.data ?? [];
+        
+        return StreamBuilder<List<ServiceRequest>>(
+          stream: _stream,
+          builder: (context, snap) {
+            if (snap.hasError) {
+              return _info(
+                Icons.error_outline,
+                'Unable to load requests',
+                'Check your connection and try again.',
+              );
+            }
+            if (!snap.hasData) {
+              return const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
 
-        const distance = Distance();
-        final now = DateTime.now();
-        final items = <(ServiceRequest, double)>[];
-        for (final r in snap.data!) {
-          if (widget.declined.contains(r.id) || r.expiresAt.isBefore(now)) {
-            continue;
-          }
-          final km =
-              distance.as(
-                LengthUnit.Meter,
-                here,
-                LatLng(r.pickup.latitude, r.pickup.longitude),
-              ) /
-              1000;
-          // Customers widen their radius over time (5 -> 10 -> 15 km).
-          if (km <= r.searchRadiusKm) items.add((r, km));
-        }
-        items.sort((a, b) => a.$2.compareTo(b.$2));
+            const distance = Distance();
+            final now = DateTime.now();
+            final items = <(ServiceRequest, double)>[];
+            for (final r in snap.data!) {
+              if (widget.declined.contains(r.id) || r.expiresAt.isBefore(now)) {
+                continue;
+              }
+              
+              LatLng baseLoc = here;
+              final matched = myServices.where((s) => s.serviceType == r.serviceType && s.isActive).toList();
+              if (matched.isNotEmpty) {
+                final geo = matched.first.locationGeo;
+                if (geo != null && (geo.latitude != 0 || geo.longitude != 0)) {
+                  baseLoc = LatLng(geo.latitude, geo.longitude);
+                }
+              }
 
-        if (items.isEmpty) {
-          return _info(
-            Icons.check_circle_outline,
-            'No new requests',
-            'Requests near you will show up here automatically.',
-          );
-        }
-        return Column(
-          children: [
-            for (final it in items)
-              _RequestCard(
-                key: ValueKey(it.$1.id),
-                request: it.$1,
-                distanceKm: it.$2,
-                onDecline: () => widget.onDecline(it.$1.id),
-                onAccept: () => widget.onAccept(it.$1),
-              ),
-          ],
+              final km =
+                  distance.as(
+                    LengthUnit.Meter,
+                    baseLoc,
+                    LatLng(r.pickup.latitude, r.pickup.longitude),
+                  ) /
+                  1000;
+              // Customers widen their radius over time (5 -> 10 -> 15 km).
+              if (km <= r.searchRadiusKm) items.add((r, km));
+            }
+            items.sort((a, b) => a.$2.compareTo(b.$2));
+
+            if (items.isEmpty) {
+              return _info(
+                Icons.check_circle_outline,
+                'No new requests',
+                'Requests near you will show up here automatically.',
+              );
+            }
+            return Column(
+              children: [
+                for (final it in items)
+                  _RequestCard(
+                    key: ValueKey(it.$1.id),
+                    request: it.$1,
+                    distanceKm: it.$2,
+                    onDecline: () => widget.onDecline(it.$1.id),
+                    onAccept: () => widget.onAccept(it.$1),
+                  ),
+              ],
+            );
+          },
         );
       },
     );

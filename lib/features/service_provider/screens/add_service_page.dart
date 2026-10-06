@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../entities/app_user.dart';
 import '../models/provider_service.dart';
 import '../services/provider_repository.dart';
+import '../../request_service/request_service.dart' show MapApi;
 
 class AddServicePage extends StatefulWidget {
   final String uid;
@@ -93,6 +94,16 @@ class _AddServicePageState extends State<AddServicePage> {
       _name.clear();
     }
     setState(() => _saving = true);
+    
+    GeoLocation? locationGeo;
+    final locText = _location.text.trim();
+    if (locText.isNotEmpty) {
+      final latLng = await MapApi.geocode(locText);
+      if (latLng != null) {
+        locationGeo = GeoLocation(latitude: latLng.latitude, longitude: latLng.longitude);
+      }
+    }
+
     try {
       final s = widget.existingService;
       if (s != null) {
@@ -101,7 +112,8 @@ class _AddServicePageState extends State<AddServicePage> {
           name: _name.text.trim(),
           vehicleTypes: _vehicles.text.trim(),
           plateNumber: _plate.text.trim(),
-          location: _location.text.trim(),
+          location: locText,
+          locationGeo: locationGeo,
           details: _details.text.trim(),
         ));
       } else {
@@ -113,7 +125,8 @@ class _AddServicePageState extends State<AddServicePage> {
             name: _name.text.trim(),
             vehicleTypes: _vehicles.text.trim(),
             plateNumber: _plate.text.trim(),
-            location: _location.text.trim(),
+            location: locText,
+            locationGeo: locationGeo,
             details: _details.text.trim(),
           ),
         );
