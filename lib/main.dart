@@ -6,8 +6,10 @@ import 'package:flutter/material.dart';
 import 'entities/app_user.dart';
 import 'features/auth/screens/welcome_page.dart';
 import 'features/home/home_page.dart';
+import 'features/incoming_request/incoming_request_page.dart';
 import 'features/service_provider/screens/provider_home_page.dart';
 import 'firebase_options.dart';
+import 'services/incoming_request_listner.dart';
 import 'services/provider_location_service.dart';
 
 void main() async {
@@ -15,6 +17,12 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Shares an available provider's live location, whatever page is open.
   ProviderLocationService.instance.autoManage();
+  // Opens the incoming request page for an available provider, whatever
+  // page is open. Uses appNavigatorKey (set on MaterialApp below).
+  IncomingRequestListener.instance.autoManage(
+    navigatorKey: appNavigatorKey,
+    pageBuilder: (request) => IncomingRequestPage(request: request),
+  );
   runApp(const MyApp());
 }
 
@@ -25,6 +33,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Roadside Assistance',
+      navigatorKey: appNavigatorKey,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color.fromARGB(255, 234, 5, 5),
