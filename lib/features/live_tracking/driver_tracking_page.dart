@@ -688,9 +688,9 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
       ),
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.fromLTRB(18, 10, 18, 14 + bottomInset),
+        padding: EdgeInsets.fromLTRB(0, 10, 0, 14 + bottomInset),
         decoration: BoxDecoration(
-          color: const Color(0xFFF7F7F8),
+          color: Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
           boxShadow: [
             BoxShadow(
@@ -716,10 +716,11 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              _buildProviderCard(),
-              const SizedBox(height: 14),
-              _buildStatusCard(),
-              _buildActions(),
+              _buildCombinedCard(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: _buildActions(),
+              ),
             ],
           ),
         ),
@@ -852,24 +853,18 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
     );
   }
 
-  /// Status + fare combined: white status section with a red fare strip.
-  Widget _buildStatusCard() {
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+  /// One card with provider details, status/progress and service + fare.
+  Widget _buildCombinedCard() {
+    return ColoredBox(
+      color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [_buildStatusContent(), _buildFareStrip()],
+        children: [
+          _buildProviderCard(),
+          Container(height: 1, color: Colors.grey.shade200),
+          _buildStatusContent(),
+          _buildFareStrip(),
+        ],
       ),
     );
   }
@@ -944,13 +939,9 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
 
     // Loading skeleton
     if (user == null || r == null) {
-      return Container(
+      return const SizedBox(
         height: 120,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: const Center(
+        child: Center(
           child: SizedBox(
             width: 22,
             height: 22,
@@ -976,19 +967,8 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
       child: Icon(Icons.person_rounded, size: 34, color: Colors.grey.shade500),
     );
 
-    return Container(
+    return Padding(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Column(
         children: [
           // Avatar + name + role + rating
@@ -1061,7 +1041,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF4D6),
+                        color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -1070,7 +1050,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                           const Icon(
                             Icons.star_rounded,
                             size: 15,
-                            color: Color(0xFFF5A300),
+                            color: Colors.black87,
                           ),
                           const SizedBox(width: 3),
                           Text(
@@ -1080,7 +1060,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF7A5200),
+                              color: Colors.black87,
                             ),
                           ),
                         ],
