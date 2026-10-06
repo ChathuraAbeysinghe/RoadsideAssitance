@@ -8,6 +8,7 @@ class ProviderService {
   final String vehicleTypes;
   final String plateNumber;
   final String location;
+  final GeoLocation? locationGeo;
   final String details;
   final bool isActive;
 
@@ -19,6 +20,7 @@ class ProviderService {
     required this.vehicleTypes,
     required this.plateNumber,
     required this.location,
+    this.locationGeo,
     required this.details,
     this.isActive = true,
   });
@@ -31,6 +33,7 @@ class ProviderService {
     String? vehicleTypes,
     String? plateNumber,
     String? location,
+    GeoLocation? locationGeo,
     String? details,
     bool? isActive,
   }) {
@@ -42,6 +45,7 @@ class ProviderService {
       vehicleTypes: vehicleTypes ?? this.vehicleTypes,
       plateNumber: plateNumber ?? this.plateNumber,
       location: location ?? this.location,
+      locationGeo: locationGeo ?? this.locationGeo,
       details: details ?? this.details,
       isActive: isActive ?? this.isActive,
     );
@@ -58,6 +62,9 @@ class ProviderService {
       vehicleTypes: map['vehicleTypes'] as String? ?? '',
       plateNumber: map['plateNumber'] as String? ?? '',
       location: map['location'] as String? ?? '',
+      locationGeo: map['locationGeo'] != null
+          ? GeoLocation.fromMap(map['locationGeo'] as Map<String, dynamic>?)
+          : null,
       details: map['details'] as String? ?? '',
       isActive: map['isActive'] as bool? ?? true,
     );
@@ -70,6 +77,7 @@ class ProviderService {
     'vehicleTypes': vehicleTypes,
     'plateNumber': plateNumber,
     'location': location,
+    'locationGeo': locationGeo?.toMap(),
     'details': details,
     'isActive': isActive,
   };
