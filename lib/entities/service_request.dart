@@ -338,19 +338,37 @@ Stream<List<NearbyProvider>> watchNearbyProviders(ServiceType service) {
       .where('isAvailable', isEqualTo: true)
       .where('services', arrayContains: service.name)
       .snapshots()
-      .map((snap) {
+      .asyncMap((snap) async {
         final list = <NearbyProvider>[];
         for (final d in snap.docs) {
+          final psSnap = await FirebaseFirestore.instance
+              .collection('providerServices')
+              .where('providerUid', isEqualTo: d.id)
+              .where('serviceType', isEqualTo: service.name)
+              .where('isActive', isEqualTo: true)
+              .get();
+              
+          if (psSnap.docs.isNotEmpty) {
+            final data = psSnap.docs.first.data();
+            final locMap = data['locationGeo'] as Map<String, dynamic>?;
+            if (locMap != null) {
+              final loc = GeoLocation.fromMap(locMap);
+              if (loc.latitude != 0 || loc.longitude != 0) {
+                list.add(NearbyProvider(uid: d.id, location: loc));
+                continue;
+              }
+            }
+          }
+
           final loc = GeoLocation.fromMap(
             d.data()['currentLocation'] as Map<String, dynamic>?,
           );
-          // Skip providers that haven't reported a location yet.
           if (loc.latitude == 0 && loc.longitude == 0) continue;
           
           final updated = d.data()['locationUpdatedAt'];
           if (updated is Timestamp &&
               DateTime.now().difference(updated.toDate()) > const Duration(minutes: 3)) {
-            continue; // provider went silent (app killed / no signal)
+            continue; 
           }
           
           list.add(NearbyProvider(uid: d.id, location: loc));
