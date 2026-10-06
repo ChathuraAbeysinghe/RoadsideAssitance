@@ -8,39 +8,65 @@ import 'package:latlong2/latlong.dart';
 
 import '../entities/app_user.dart';
 import '../entities/service_request.dart';
+import 'tracking_registry.dart';
 
 /// Give this to `MaterialApp(navigatorKey: appNavigatorKey)` so the listener
-/// below can open a page from anywhere, whatever screen the provider is on.
+/// below can open pages from anywhere, whatever screen the user is on.
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
-/// Runs for the whole life of the app. While an available assistance provider
-/// is logged in, it watches for new pending requests that are:
-///   - for a service the provider offers,
-///   - inside the request's current search radius from the provider, and
-///   - not expired / not one the provider already saw.
-/// When one arrives it opens the "incoming request" page on top of whatever
-/// page is showing. If the provider accepts, it then opens the job page
-/// (map + status buttons).
+typedef RequestPageBuilder = Widget Function(ServiceRequest request);
+
+/// Runs for the whole life of the app and drives navigation for BOTH roles.
+///
+/// ASSISTANCE PROVIDER
+///   1. While available, watches pending requests (for the services they
+///      offer, inside the request's search radius) and opens the incoming
+///      request page on top of whatever page is showing.
+///   2. On Accept, opens the provider tracking page.
+///   3. If the provider has an active job when the app starts (or it
+///      appears some other way), opens the provider tracking page for it.
+///
+/// DRIVER (customer)
+///   - When a provider accepts the driver's request while the driver is on
+///     the app (or the app starts with an active request), opens the driver
+///     tracking page.
+///
+/// A job's tracking page is opened automatically only once per app session
+/// (see [TrackingRegistry]), so leaving the page is never undone by a later
+/// status change. Reopen it from the home page's ongoing requests.
 ///
 /// Setup (once, in main(), after Firebase.initializeApp()):
 ///   IncomingRequestListener.instance.autoManage(
 ///     navigatorKey: appNavigatorKey,
-///     pageBuilder: (request) => IncomingRequestPage(request: request),
-///     acceptedPageBuilder: (request) => ProviderJobPage(request: request),
+///     incomingPageBuilder: (r) => IncomingRequestPage(request: r),
+///     providerTrackingBuilder: (r) => ProviderTrackingPage(requestId: r.id),
+///     driverTrackingBuilder: (r) => DriverTrackingPage(
+///       requestId: r.id,
+///       pickup: LatLng(r.pickup.latitude, r.pickup.longitude),
+///     ),
 ///   );
 ///
-/// Call `refresh()` after the provider changes availability or services.
+/// Call `refresh()` after a provider changes availability or services.
 class IncomingRequestListener {
   IncomingRequestListener._();
   static final IncomingRequestListener instance = IncomingRequestListener._();
 
   GlobalKey<NavigatorState>? _navKey;
-  Widget Function(ServiceRequest)? _pageBuilder;
-  Widget Function(ServiceRequest)? _acceptedPageBuilder;
+  RequestPageBuilder? _incomingBuilder;
+  RequestPageBuilder? _providerTrackingBuilder;
+  RequestPageBuilder? _driverTrackingBuilder;
 
   StreamSubscription<User?>? _authSub;
-  StreamSubscription<List<ServiceRequest>>? _reqSub;
+  StreamSubscription<List<ServiceRequest>>?
+  _pendingSub; // provider: new requests
+  StreamSubscription<List<ServiceRequest>>? _jobSub; // provider: own jobs
+  StreamSubscription<List<ServiceRequest>>? _driverSub; // driver: own requests
 
+  /// Logged-in user for the job / driver watches.
+  String? _roleUid;
+
+  // ---- provider: incoming requests ----
+  /// Set while listening for pending requests.
   String? _uid;
   GeoLocation _savedLocation = const GeoLocation(latitude: 0, longitude: 0);
 
@@ -48,33 +74,49 @@ class IncomingRequestListener {
   /// offered again, but the same one isn't shown twice).
   final Set<String> _handled = {};
   List<ServiceRequest> _latest = const [];
-  bool _busy = false; // evaluating, or a page is open
+
+  /// True while an incoming request page (or the tracking page opened by
+  /// accepting it) is on screen.
+  bool _busy = false;
+
+  // ---- provider: jobs ----
+  List<ServiceRequest> _latestJobs = const [];
+  final Set<String> _providerOpened = {};
+  bool _jobPushing = false;
+
+  // ---- driver ----
+  List<ServiceRequest> _latestDriver = const [];
+  final Set<String> _driverOpened = {};
+  bool _driverPushing = false;
+
+  Timer? _retryTimer;
 
   void _log(String msg) => debugPrint('[IncomingRequest] $msg');
 
   void autoManage({
     required GlobalKey<NavigatorState> navigatorKey,
-    required Widget Function(ServiceRequest) pageBuilder,
-    Widget Function(ServiceRequest)? acceptedPageBuilder,
+    required RequestPageBuilder incomingPageBuilder,
+    required RequestPageBuilder providerTrackingBuilder,
+    required RequestPageBuilder driverTrackingBuilder,
   }) {
     _navKey = navigatorKey;
-    _pageBuilder = pageBuilder;
-    _acceptedPageBuilder = acceptedPageBuilder;
+    _incomingBuilder = incomingPageBuilder;
+    _providerTrackingBuilder = providerTrackingBuilder;
+    _driverTrackingBuilder = driverTrackingBuilder;
     _authSub ??= FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user == null) {
-        _stop();
+        _stopAll();
       } else {
         refresh();
       }
     });
   }
 
-  /// Re-checks the logged-in user: listening only runs for an available
-  /// assistance provider that offers at least one service.
+  /// Re-checks the logged-in user and starts/stops the right watches.
   Future<void> refresh() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _stop();
+      _stopAll();
       return;
     }
     try {
@@ -84,44 +126,109 @@ class IncomingRequestListener {
           .get();
       final data = doc.data();
       if (data == null) {
-        _stop();
+        _stopAll();
         return;
       }
       final appUser = userFromMap(user.uid, data);
-      if (appUser is AssistanceProvider &&
-          appUser.isAvailable &&
-          appUser.services.isNotEmpty) {
-        _savedLocation = appUser.currentLocation;
-        _start(user.uid, appUser.services);
+
+      if (appUser is AssistanceProvider) {
+        _stopDriverWatch();
+        _startJobWatch(user.uid);
+        if (appUser.isAvailable && appUser.services.isNotEmpty) {
+          _savedLocation = appUser.currentLocation;
+          _startPending(user.uid, appUser.services);
+        } else {
+          _log('provider not available, not listening for new requests');
+          _stopPending();
+        }
       } else {
-        _log('not an available provider, not listening');
-        _stop();
+        _stopPending();
+        _stopJobWatch();
+        _startDriverWatch(user.uid);
       }
     } catch (e) {
       _log('refresh() failed: $e');
     }
   }
 
-  void _start(String uid, Set<ServiceType> services) {
-    _reqSub?.cancel();
+  // ---------------- start / stop ----------------
+  void _startPending(String uid, Set<ServiceType> services) {
+    _pendingSub?.cancel();
     _uid = uid;
     _log('listening for ${services.map((s) => s.name).join(', ')}');
-    _reqSub = watchPendingRequests(services)
-        .listen(_onRequests, onError: (e) => _log('request stream error: $e'));
+    _pendingSub = watchPendingRequests(services)
+        .listen(_onPending, onError: (e) => _log('pending stream error: $e'));
   }
 
-  void _stop() {
-    _reqSub?.cancel();
-    _reqSub = null;
+  void _stopPending() {
+    _pendingSub?.cancel();
+    _pendingSub = null;
     _uid = null;
     _latest = const [];
   }
 
-  // ---------------- handling ----------------
+  void _startJobWatch(String uid) {
+    if (_jobSub != null && _roleUid == uid) return;
+    _jobSub?.cancel();
+    _roleUid = uid;
+    _jobSub = watchProviderJobs(uid).listen((list) {
+      _latestJobs = list;
+      _openProviderJobs();
+    }, onError: (e) => _log('job stream error: $e'));
+  }
+
+  void _stopJobWatch() {
+    _jobSub?.cancel();
+    _jobSub = null;
+    _latestJobs = const [];
+  }
+
+  void _startDriverWatch(String uid) {
+    if (_driverSub != null && _roleUid == uid) return;
+    _driverSub?.cancel();
+    _roleUid = uid;
+    _driverSub = FirebaseFirestore.instance
+        .collection('service_requests')
+        .where('customerUid', isEqualTo: uid)
+        .snapshots()
+        .map((snap) {
+          final list = <ServiceRequest>[];
+          for (final d in snap.docs) {
+            try {
+              list.add(ServiceRequest.fromMap(d.id, d.data()));
+            } catch (_) {}
+          }
+          return list;
+        })
+        .listen((list) {
+          _latestDriver = list;
+          _openDriverPages();
+        }, onError: (e) => _log('driver stream error: $e'));
+  }
+
+  void _stopDriverWatch() {
+    _driverSub?.cancel();
+    _driverSub = null;
+    _latestDriver = const [];
+  }
+
+  void _stopAll() {
+    _stopPending();
+    _stopJobWatch();
+    _stopDriverWatch();
+    _roleUid = null;
+    _handled.clear();
+    _providerOpened.clear();
+    _driverOpened.clear();
+    _retryTimer?.cancel();
+    TrackingRegistry.clear();
+  }
+
+  // ---------------- provider: incoming requests ----------------
   String _key(ServiceRequest r) =>
       '${r.id}_${r.expiresAt.millisecondsSinceEpoch}';
 
-  void _onRequests(List<ServiceRequest> list) {
+  void _onPending(List<ServiceRequest> list) {
     _latest = list;
     _drain();
   }
@@ -146,11 +253,14 @@ class IncomingRequestListener {
         final shown = await _show(next);
         if (!shown) {
           _handled.remove(_key(next)); // app not ready; retry later
+          _retryLater();
           break;
         }
       }
     } finally {
       _busy = false;
+      // A job may have appeared while we were busy.
+      _openProviderJobs();
     }
   }
 
@@ -206,11 +316,11 @@ class IncomingRequestListener {
   }
 
   /// Opens the incoming request page and waits until the provider closes it.
-  /// If they accepted, opens the job page and waits for that too, so no new
-  /// request pops up over a job in progress.
+  /// If they accepted, opens the provider tracking page and waits for that
+  /// too, so no new request pops up over a job they just started.
   Future<bool> _show(ServiceRequest r) async {
     final nav = _navKey?.currentState;
-    final builder = _pageBuilder;
+    final builder = _incomingBuilder;
     if (nav == null || builder == null) return false;
     _log('showing request ${r.id}');
 
@@ -218,11 +328,112 @@ class IncomingRequestListener {
       MaterialPageRoute(fullscreenDialog: true, builder: (_) => builder(r)),
     );
 
-    final jobBuilder = _acceptedPageBuilder;
-    if (accepted == true && jobBuilder != null && nav.mounted) {
-      _log('accepted ${r.id}, opening job page');
-      await nav.push<void>(MaterialPageRoute(builder: (_) => jobBuilder(r)));
+    if (accepted == true && nav.mounted) {
+      _log('accepted ${r.id}, opening provider tracking page');
+      _providerOpened.add(r.id);
+      await _pushPage(_providerTrackingBuilder, r);
     }
     return true;
+  }
+
+  // ---------------- provider: own jobs ----------------
+  ServiceRequest? _nextProviderJob() {
+    for (final r in _latestJobs) {
+      if (kActiveStatuses.contains(r.status) &&
+          !_providerOpened.contains(r.id) &&
+          !TrackingRegistry.wasOpened(r.id)) {
+        return r;
+      }
+    }
+    return null;
+  }
+
+  /// Opens the tracking page for an active job the provider hasn't seen yet
+  /// this session (e.g. the app was restarted mid-job). Skipped while the
+  /// accept flow is running; it opens the page itself.
+  Future<void> _openProviderJobs() async {
+    if (_jobPushing || _busy) return;
+    _jobPushing = true;
+    try {
+      while (_roleUid != null && _jobSub != null && !_busy) {
+        final next = _nextProviderJob();
+        if (next == null) break;
+
+        _providerOpened.add(next.id);
+        final ok = await _pushPage(_providerTrackingBuilder, next);
+        if (!ok) {
+          _providerOpened.remove(next.id);
+          _retryLater();
+          break;
+        }
+      }
+    } finally {
+      _jobPushing = false;
+    }
+  }
+
+  // ---------------- driver ----------------
+  ServiceRequest? _nextDriverRequest() {
+    for (final r in _latestDriver) {
+      if (kActiveStatuses.contains(r.status) &&
+          r.providerUid != null &&
+          !_driverOpened.contains(r.id) &&
+          !TrackingRegistry.wasOpened(r.id)) {
+        return r;
+      }
+    }
+    return null;
+  }
+
+  /// Opens the driver tracking page once a provider has accepted the
+  /// driver's request.
+  Future<void> _openDriverPages() async {
+    if (_driverPushing) return;
+    _driverPushing = true;
+    try {
+      while (_roleUid != null && _driverSub != null) {
+        final first = _nextDriverRequest();
+        if (first == null) break;
+
+        // Short grace period: the searching page may open the tracking page
+        // itself. If it does, the registry knows and we skip.
+        await Future.delayed(const Duration(milliseconds: 700));
+        if (_driverSub == null) break;
+
+        final next = _nextDriverRequest();
+        if (next == null) break;
+
+        _driverOpened.add(next.id);
+        _log('provider accepted ${next.id}, opening driver tracking page');
+        final ok = await _pushPage(_driverTrackingBuilder, next);
+        if (!ok) {
+          _driverOpened.remove(next.id);
+          _retryLater();
+          break;
+        }
+      }
+    } finally {
+      _driverPushing = false;
+    }
+  }
+
+  // ---------------- shared ----------------
+  /// Pushes a page and waits until it closes. Returns false if the app's
+  /// navigator isn't ready yet.
+  Future<bool> _pushPage(RequestPageBuilder? builder, ServiceRequest r) async {
+    final nav = _navKey?.currentState;
+    if (nav == null || builder == null || !nav.mounted) return false;
+    await nav.push<void>(MaterialPageRoute(builder: (_) => builder(r)));
+    return true;
+  }
+
+  /// Tries again shortly (e.g. the navigator wasn't ready at app start).
+  void _retryLater() {
+    _retryTimer?.cancel();
+    _retryTimer = Timer(const Duration(seconds: 2), () {
+      _drain();
+      _openProviderJobs();
+      _openDriverPages();
+    });
   }
 }

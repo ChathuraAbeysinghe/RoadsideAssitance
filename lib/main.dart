@@ -2,11 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'entities/app_user.dart';
 import 'features/auth/screens/welcome_page.dart';
 import 'features/home/home_page.dart';
 import 'features/incoming_request/incoming_request_page.dart';
+import 'features/live_tracking/provider_tracking_page.dart';
+import 'features/live_tracking/driver_tracking_page.dart';
 import 'features/service_provider/screens/provider_home_page.dart';
 import 'firebase_options.dart';
 import 'services/incoming_request_listner.dart';
@@ -17,11 +20,21 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Shares an available provider's live location, whatever page is open.
   ProviderLocationService.instance.autoManage();
-  // Opens the incoming request page for an available provider, whatever
-  // page is open. Uses appNavigatorKey (set on MaterialApp below).
+  // Opens the right page for each role (incoming request, provider tracking,
+  // driver tracking), whatever page is open. Uses appNavigatorKey (set on
+  // MaterialApp below).
   IncomingRequestListener.instance.autoManage(
     navigatorKey: appNavigatorKey,
-    pageBuilder: (request) => IncomingRequestPage(request: request),
+    // Provider: new request popup.
+    incomingPageBuilder: (request) => IncomingRequestPage(request: request),
+    // Provider: opened right after Accept (live map, driver details, status).
+    providerTrackingBuilder: (request) =>
+        ProviderTrackingPage(requestId: request.id),
+    // Driver: opened automatically once a provider accepts their request.
+    driverTrackingBuilder: (request) => DriverTrackingPage(
+      requestId: request.id,
+      pickup: LatLng(request.pickup.latitude, request.pickup.longitude),
+    ),
   );
   runApp(const MyApp());
 }
