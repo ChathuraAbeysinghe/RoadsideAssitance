@@ -528,7 +528,11 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [_buildCombinedCard(), _buildDetails()],
+                  children: [
+                    _buildCombinedCard(),
+                    _buildDetails(),
+                    _buildCancelLink(),
+                  ],
                 ),
               ),
             ),
@@ -714,20 +718,6 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: _brandRed.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.directions_car_filled_rounded,
-                      size: 20,
-                      color: _brandRed,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -943,9 +933,46 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                   ],
                 ),
               ),
+              _buildTripInfo(),
             ],
           ),
           _buildProgress(),
+        ],
+      ),
+    );
+  }
+
+  /// Trip distance and duration, shown on the right of the status header.
+  Widget _buildTripInfo() {
+    final r = _r;
+    if (r == null || (r.distanceKm == null && r.durationMin == null)) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (r.distanceKm != null)
+            Text(
+              '${r.distanceKm!.toStringAsFixed(1)} km',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Colors.black87,
+              ),
+            ),
+          if (r.durationMin != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              '${r.durationMin} min',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1007,14 +1034,9 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
   }
 
   // ---- request details ----
-  String _formatTime(DateTime d) {
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${d.year}-${two(d.month)}-${two(d.day)} ${two(d.hour)}:${two(d.minute)}';
-  }
-
   String _money(double v) => 'LKR ${_formatAmount(v)}';
 
-  /// Remaining request details (pickup, drop-off, fuel, notes, fee breakdown).
+  /// Remaining request details (pickup, drop-off, fuel, notes, fuel cost).
   Widget _buildDetails() {
     final r = _r!;
     return Container(
@@ -1028,18 +1050,18 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _infoRow(Icons.location_on_outlined, 'Pickup', r.pickupAddress),
+          _infoRow(
+            Icons.location_on_outlined,
+            'Pickup',
+            r.pickupAddress,
+            maxLines: 2,
+          ),
           if (r.dropoffAddress != null && r.dropoffAddress!.isNotEmpty)
-            _infoRow(Icons.flag_outlined, 'Drop-off', r.dropoffAddress!),
-          if (r.distanceKm != null || r.durationMin != null)
             _infoRow(
-              Icons.route_outlined,
-              'Trip',
-              [
-                if (r.distanceKm != null)
-                  '${r.distanceKm!.toStringAsFixed(1)} km',
-                if (r.durationMin != null) '${r.durationMin} min',
-              ].join(' · '),
+              Icons.flag_outlined,
+              'Drop-off',
+              r.dropoffAddress!,
+              maxLines: 2,
             ),
           if (r.liters != null)
             _infoRow(
@@ -1049,38 +1071,18 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
             ),
           if (r.notes.isNotEmpty)
             _infoRow(Icons.note_alt_outlined, 'Notes', r.notes),
-          Divider(height: 14, color: Colors.grey.shade300),
-          _infoRow(
-            Icons.receipt_long_outlined,
-            'Service fee',
-            _money(r.serviceFee),
-          ),
           if (r.fuelCost > 0)
             _infoRow(
               Icons.local_gas_station_outlined,
               'Fuel cost',
               _money(r.fuelCost),
             ),
-          if (r.createdAt != null)
-            _infoRow(
-              Icons.schedule_outlined,
-              'Requested',
-              _formatTime(r.createdAt!),
-            ),
-          if (r.acceptedAt != null)
-            _infoRow(
-              Icons.check_circle_outline,
-              'Accepted',
-              _formatTime(r.acceptedAt!),
-            ),
-          if (r.completedAt != null)
-            _infoRow(Icons.done_all, 'Completed', _formatTime(r.completedAt!)),
         ],
       ),
     );
   }
 
-  Widget _infoRow(IconData icon, String label, String value) {
+  Widget _infoRow(IconData icon, String label, String value, {int? maxLines}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -1099,6 +1101,8 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                 const SizedBox(height: 1),
                 Text(
                   value,
+                  maxLines: maxLines,
+                  overflow: maxLines == null ? null : TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
@@ -1170,29 +1174,26 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                     ),
             ),
           ),
-          if (_canCancel) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton(
-                onPressed: _busy ? null : _confirmCancel,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _brandRed,
-                  backgroundColor: Colors.white,
-                  side: BorderSide(color: _brandRed.withValues(alpha: 0.5)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-                child: const Text(
-                  'Cancel Job',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
         ],
+      ),
+    );
+  }
+
+  /// Small red text at the very bottom of the scrollable content.
+  Widget _buildCancelLink() {
+    if (!_canCancel) return const SizedBox.shrink();
+    return Center(
+      child: TextButton(
+        onPressed: _busy ? null : _confirmCancel,
+        style: TextButton.styleFrom(
+          foregroundColor: _brandRed,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: const Text(
+          'Cancel job',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
