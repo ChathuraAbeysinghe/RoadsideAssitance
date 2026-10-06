@@ -742,7 +742,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
     RequestStatus.expired => 'Request Expired',
   };
 
-  /// Status header: icon, title, distance, ETA and a progress tracker.
+  /// Status header: title, distance, ETA (plain text) and a progress tracker.
   Widget _buildStatusContent() {
     final p = _routeFrom;
     String? etaValue;
@@ -804,45 +804,29 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
               ),
               if (etaValue != null) ...[
                 const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _brandRed,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _brandRed.withValues(alpha: 0.35),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                // Plain black text, no red box.
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      etaValue,
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        height: 1.05,
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        etaValue,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          height: 1.05,
-                        ),
+                    ),
+                    Text(
+                      'MIN',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
                       ),
-                      Text(
-                        'MIN',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -861,9 +845,9 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildProviderCard(),
+          _buildFareStrip(),
           Container(height: 1, color: Colors.grey.shade200),
           _buildStatusContent(),
-          _buildFareStrip(),
         ],
       ),
     );
@@ -1198,20 +1182,6 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _brandRed.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.handyman_rounded,
-              size: 20,
-              color: _brandRed,
-            ),
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
