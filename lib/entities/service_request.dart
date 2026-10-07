@@ -59,10 +59,11 @@ class ServiceRequest {
   final GeoLocation? dropoff;
   final String? dropoffAddress;
 
-  final GeoLocation? customerLocation;   // live position written by the customer app
+  final GeoLocation?
+  customerLocation; // live position written by the customer app
   final DateTime? acceptedAt;
   final DateTime? completedAt;
-  final String? cancelledBy;             // 'customer' | 'provider'
+  final String? cancelledBy; // 'customer' | 'provider'
 
   /// Snapshot of the vehicle at request time (id, make, model, plate...).
   final Map<String, dynamic>? vehicle;
@@ -130,7 +131,9 @@ class ServiceRequest {
       dropoffAddress: map['dropoffAddress'] as String?,
       customerLocation: map['customerLocation'] == null
           ? null
-          : GeoLocation.fromMap(map['customerLocation'] as Map<String, dynamic>?),
+          : GeoLocation.fromMap(
+              map['customerLocation'] as Map<String, dynamic>?,
+            ),
       acceptedAt: ts(map['acceptedAt']),
       completedAt: ts(map['completedAt']),
       cancelledBy: map['cancelledBy'] as String?,
@@ -347,7 +350,7 @@ Stream<List<NearbyProvider>> watchNearbyProviders(ServiceType service) {
               .where('serviceType', isEqualTo: service.name)
               .where('isActive', isEqualTo: true)
               .get();
-              
+
           if (psSnap.docs.isNotEmpty) {
             final data = psSnap.docs.first.data();
             final locMap = data['locationGeo'] as Map<String, dynamic>?;
@@ -364,13 +367,14 @@ Stream<List<NearbyProvider>> watchNearbyProviders(ServiceType service) {
             d.data()['currentLocation'] as Map<String, dynamic>?,
           );
           if (loc.latitude == 0 && loc.longitude == 0) continue;
-          
+
           final updated = d.data()['locationUpdatedAt'];
           if (updated is Timestamp &&
-              DateTime.now().difference(updated.toDate()) > const Duration(minutes: 3)) {
-            continue; 
+              DateTime.now().difference(updated.toDate()) >
+                  const Duration(minutes: 3)) {
+            continue;
           }
-          
+
           list.add(NearbyProvider(uid: d.id, location: loc));
         }
         return list;
@@ -387,17 +391,19 @@ const Set<RequestStatus> kActiveStatuses = {
 /// All jobs a provider has taken, newest first (sorted on the device so no
 /// composite index is needed).
 Stream<List<ServiceRequest>> watchProviderJobs(String providerUid) {
-  return _requests
-      .where('providerUid', isEqualTo: providerUid)
-      .snapshots()
-      .map((snap) {
-        final list = snap.docs
-            .map((d) => ServiceRequest.fromMap(d.id, d.data()))
-            .toList();
-        list.sort((a, b) => (b.createdAt ?? DateTime.now())
-            .compareTo(a.createdAt ?? DateTime.now()));
-        return list;
-      });
+  return _requests.where('providerUid', isEqualTo: providerUid).snapshots().map(
+    (snap) {
+      final list = snap.docs
+          .map((d) => ServiceRequest.fromMap(d.id, d.data()))
+          .toList();
+      list.sort(
+        (a, b) => (b.createdAt ?? DateTime.now()).compareTo(
+          a.createdAt ?? DateTime.now(),
+        ),
+      );
+      return list;
+    },
+  );
 }
 
 const Map<RequestStatus, Set<RequestStatus>> _allowedNext = {
@@ -423,10 +429,10 @@ Future<bool> updateJobStatus({
     if (!(_allowedNext[current]?.contains(next) ?? false)) return false;
     tx.update(ref, {
       'status': next.name,
-      '${next.name}At': FieldValue.serverTimestamp(), // completedAt, cancelledAt...
+      '${next.name}At':
+          FieldValue.serverTimestamp(), // completedAt, cancelledAt...
       if (next == RequestStatus.cancelled) 'cancelledBy': 'provider',
     });
     return true;
   });
 }
-
