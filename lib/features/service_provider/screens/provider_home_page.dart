@@ -22,7 +22,6 @@ const Color _brandRed = Color(0xFFE30613);
 
 class ProviderHomePage extends StatefulWidget {
   final UserType userType;
-  // Kept so existing callers still compile; the page reads live data itself.
   final String userName;
   final String profileImagePath;
   final String uid;
@@ -61,7 +60,6 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
           .snapshots();
       _jobsStream = watchProviderJobs(_uid);
       _unreadStream = _repo.watchUnreadCount(_uid);
-      // Make sure location sharing matches availability / active job.
       ProviderLocationService.instance.refresh();
     }
   }
@@ -70,7 +68,7 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
   }
 
   String get _greeting {
@@ -131,7 +129,7 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
           if (data == null) {
             return userSnap.hasError
                 ? const Center(child: Text('Unable to load your profile.'))
-                : const Center(child: CircularProgressIndicator());
+                : const Center(child: CircularProgressIndicator(color: _brandRed));
           }
           final user = userFromMap(_uid, data);
           if (user is! AssistanceProvider) {
@@ -182,7 +180,7 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
       slivers: [
         SliverToBoxAdapter(child: _buildHeader(user, active != null)),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 30, 20, 24),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               if (active != null) ...[
@@ -198,17 +196,18 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
                 onDecline: (id) => setState(() => _declined.add(id)),
                 onAccept: (r) => _accept(r, user.name),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
               _sectionLabel("TODAY'S SUMMARY"),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  _Summary(label: 'Completed Jobs', value: '${todayDone.length}'),
+                  _Summary(label: 'Completed Jobs', value: '${todayDone.length}', icon: Icons.task_alt),
                   const SizedBox(width: 12),
                   _Summary(
                     label: 'Earnings',
                     value: 'Rs ${todayEarnings.toStringAsFixed(0)}',
-                    red: true,
+                    icon: Icons.payments_outlined,
+                    highlight: true,
                   ),
                 ],
               ),
@@ -219,14 +218,15 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
                     label: 'Rating',
                     value: rating.count > 0
                         ? rating.average.toStringAsFixed(1)
-                        : 'No ratings',
+                        : 'New',
+                    icon: Icons.star_border,
                     green: rating.count > 0,
                   ),
                   const SizedBox(width: 12),
-                  _Summary(label: 'Total Jobs', value: '${completed.length}'),
+                  _Summary(label: 'Total Jobs', value: '${completed.length}', icon: Icons.history),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -237,21 +237,37 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
                         builder: (_) => const ProviderJobsPage(),
                       ),
                     ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     child: const Text(
                       'See All',
                       style: TextStyle(
                         color: _brandRed,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               if (completed.isEmpty)
-                const Text(
-                  'No completed jobs yet.',
-                  style: TextStyle(color: Colors.grey),
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.grey.shade100),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'No completed jobs yet.',
+                      style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                    ),
+                  ),
                 )
               else
                 ...completed.take(3).map((j) => JobHistoryTile(job: j)),
@@ -264,10 +280,11 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
 
   Widget _sectionLabel(String text) => Text(
     text,
-    style: const TextStyle(
-      fontSize: 14,
+    style: TextStyle(
+      fontSize: 13,
       fontWeight: FontWeight.w800,
-      color: Colors.grey,
+      letterSpacing: 1.2,
+      color: Colors.grey.shade500,
     ),
   );
 
@@ -281,48 +298,61 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
         ? 'Online & Available'
         : 'Offline';
     final String availabilitySub = onJob
-        ? 'Sharing your location with the customer'
+        ? 'Location shared with customer'
         : user.isAvailable
         ? 'Ready to accept jobs'
-        : 'You will not receive new requests';
+        : 'Not receiving requests';
 
-    return Container(
-      color: _brandRed,
-      padding: EdgeInsets.fromLTRB(20, top + 20, 20, 20),
-      child: Column(
-        children: [
-          Row(
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: EdgeInsets.fromLTRB(20, top + 20, 20, 50),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFE30613), Color(0xFFC70511)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 25,
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                backgroundImage: hasPhoto
-                    ? NetworkImage(user.profileImagePath)
-                    : null,
-                child: hasPhoto
-                    ? null
-                    : const Icon(Icons.person_outline, color: Colors.white),
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
+                ),
+                child: CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.white.withValues(alpha: 0.2),
+                  backgroundImage: hasPhoto ? NetworkImage(user.profileImagePath) : null,
+                  child: hasPhoto ? null : const Icon(Icons.person, color: Colors.white, size: 28),
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const SizedBox(height: 4),
                     Text(
                       _greeting,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       user.name.isEmpty ? 'Provider' : user.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
+                        fontSize: 24,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -332,58 +362,75 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
               _buildBell(),
             ],
           ),
-          const SizedBox(height: 24),
-          Container(
+        ),
+        Positioned(
+          bottom: -25,
+          left: 20,
+          right: 20,
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
             ),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 5,
-                  backgroundColor: user.isAvailable || onJob
-                      ? Colors.teal
-                      : Colors.grey,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (user.isAvailable || onJob ? Colors.teal : Colors.grey).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: CircleAvatar(
+                    radius: 5,
+                    backgroundColor: user.isAvailable || onJob
+                        ? Colors.teal
+                        : Colors.grey,
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         availabilityTitle,
                         style: const TextStyle(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.bold,
                           fontSize: 16,
+                          color: Colors.black87,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         availabilitySub,
-                        style: const TextStyle(color: Colors.grey, fontSize: 13),
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
                 ),
                 Switch(
                   value: user.isAvailable,
-                  onChanged: _setAvailable,
-                  thumbColor: const WidgetStatePropertyAll(Colors.white),
-                  trackColor: WidgetStateProperty.resolveWith(
-                    (s) => s.contains(WidgetState.selected)
-                        ? Colors.teal
-                        : Colors.grey.shade400,
-                  ),
-                  trackOutlineColor: const WidgetStatePropertyAll(
-                    Colors.transparent,
-                  ),
+                  onChanged: onJob ? null : _setAvailable,
+                  activeColor: Colors.teal,
+                  activeTrackColor: Colors.teal.withValues(alpha: 0.2),
+                  inactiveThumbColor: Colors.grey.shade400,
+                  inactiveTrackColor: Colors.grey.shade200,
+                  trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -401,11 +448,16 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              CircleAvatar(
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
                 child: const Icon(
                   Icons.notifications_none_rounded,
                   color: Colors.white,
+                  size: 24,
                 ),
               ),
               if (unread > 0)
@@ -414,19 +466,20 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
                   top: -2,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 1,
+                      horizontal: 6,
+                      vertical: 2,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _brandRed, width: 1.5),
                     ),
                     child: Text(
                       unread > 9 ? '9+' : '$unread',
                       style: const TextStyle(
                         color: _brandRed,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
@@ -448,53 +501,76 @@ class _ActiveJobBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: _brandRed, width: 1.5),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ProviderJobPage(requestId: job.id)),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE30613), Color(0xFFB3040E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              const Icon(Icons.local_shipping_outlined, color: _brandRed, size: 30),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'ACTIVE JOB',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: _brandRed,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      serviceTypeTitle(job.serviceType),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      statusLabel(job.status),
-                      style: TextStyle(color: statusColor(job.status)),
-                    ),
-                  ],
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE30613).withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => ProviderJobPage(requestId: job.id)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.local_shipping_outlined, color: Colors.white, size: 28),
                 ),
-              ),
-              const Icon(Icons.chevron_right),
-            ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'CURRENT ACTIVE JOB',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white70,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        serviceTypeTitle(job.serviceType),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        statusLabel(job.status),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -525,8 +601,6 @@ class _PendingSection extends StatefulWidget {
 }
 
 class _PendingSectionState extends State<_PendingSection> {
-  // Cached so the Firestore listener isn't recreated on every rebuild
-  // (the provider doc changes every few seconds with the GPS updates).
   late Stream<List<ServiceRequest>> _stream;
   late Stream<List<ProviderService>> _servicesStream;
 
@@ -548,19 +622,26 @@ class _PendingSectionState extends State<_PendingSection> {
     }
   }
 
-  Widget _info(IconData icon, String title, String sub) {
+  Widget _info(IconData icon, String title, String sub, {Color color = Colors.blue}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
+        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.grey.shade500, size: 28),
-          const SizedBox(width: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -569,13 +650,14 @@ class _PendingSectionState extends State<_PendingSection> {
                   title,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   sub,
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -590,9 +672,10 @@ class _PendingSectionState extends State<_PendingSection> {
     final p = widget.provider;
     if (!p.isAvailable) {
       return _info(
-        Icons.power_settings_new,
+        Icons.power_settings_new_rounded,
         'You are offline',
         'Turn on availability to receive requests.',
+        color: Colors.grey,
       );
     }
     if (widget.hasActiveJob) {
@@ -600,6 +683,7 @@ class _PendingSectionState extends State<_PendingSection> {
         Icons.assignment_turned_in_outlined,
         'Finish your current job',
         'New requests appear once it is done.',
+        color: Colors.orange,
       );
     }
     if (p.services.isEmpty) {
@@ -607,6 +691,7 @@ class _PendingSectionState extends State<_PendingSection> {
         Icons.build_outlined,
         'No services selected',
         'Add a service in the Services tab to receive requests.',
+        color: _brandRed,
       );
     }
     final loc = p.currentLocation;
@@ -632,12 +717,13 @@ class _PendingSectionState extends State<_PendingSection> {
                 Icons.error_outline,
                 'Unable to load requests',
                 'Check your connection and try again.',
+                color: _brandRed,
               );
             }
             if (!snap.hasData) {
               return const Padding(
                 padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(child: CircularProgressIndicator(color: _brandRed)),
               );
             }
 
@@ -665,16 +751,16 @@ class _PendingSectionState extends State<_PendingSection> {
                     LatLng(r.pickup.latitude, r.pickup.longitude),
                   ) /
                   1000;
-              // Customers widen their radius over time (5 -> 10 -> 15 km).
               if (km <= r.searchRadiusKm) items.add((r, km));
             }
             items.sort((a, b) => a.$2.compareTo(b.$2));
 
             if (items.isEmpty) {
               return _info(
-                Icons.check_circle_outline,
-                'No new requests',
+                Icons.radar_rounded,
+                'Searching for requests...',
                 'Requests near you will show up here automatically.',
+                color: Colors.teal,
               );
             }
             return Column(
@@ -749,49 +835,60 @@ class _RequestCardState extends State<_RequestCard> {
     final mm = left.inMinutes.clamp(0, 99).toString();
     final ss = (left.inSeconds % 60).clamp(0, 59).toString().padLeft(2, '0');
 
-    return Card(
-      elevation: 4,
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      shadowColor: Colors.red.withValues(alpha: 0.2),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: _brandRed, width: 1.5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+        border: Border.all(color: Colors.grey.shade100),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: const BoxDecoration(
-              color: _brandRed,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              border: Border(bottom: BorderSide(color: Colors.orange.shade100)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'NEW REQUEST',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
-                  ),
+                Row(
+                  children: [
+                    const Icon(Icons.access_time_rounded, color: Colors.deepOrange, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      expired ? 'EXPIRED' : 'NEW REQUEST',
+                      style: const TextStyle(
+                        color: Colors.deepOrange,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
+                    color: expired ? Colors.grey.shade200 : _brandRed,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    expired ? 'Expired' : '$mm:$ss left',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                    expired ? '00:00' : '$mm:$ss',
+                    style: TextStyle(
+                      color: expired ? Colors.grey.shade600 : Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
@@ -810,8 +907,9 @@ class _RequestCardState extends State<_RequestCard> {
                       child: Text(
                         serviceTypeTitle(r.serviceType),
                         style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
                     ),
@@ -819,69 +917,39 @@ class _RequestCardState extends State<_RequestCard> {
                       money(r.totalAmount),
                       style: const TextStyle(
                         color: _brandRed,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.location_on_outlined, color: _brandRed, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${r.pickupAddress}\n${widget.distanceKm.toStringAsFixed(1)} km away',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 16),
+                _InfoRow(icon: Icons.location_on_outlined, text: '${r.pickupAddress}\n${widget.distanceKm.toStringAsFixed(1)} km away'),
                 if (r.dropoffAddress != null && r.dropoffAddress!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.flag_outlined, size: 20, color: Colors.black87),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${r.dropoffAddress}'
-                          '${r.distanceKm != null ? ' (${r.distanceKm!.toStringAsFixed(1)} km trip)' : ''}',
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
+                  const SizedBox(height: 12),
+                  _InfoRow(icon: Icons.flag_outlined, text: '${r.dropoffAddress}${r.distanceKm != null ? ' (${r.distanceKm!.toStringAsFixed(1)} km trip)' : ''}'),
                 ],
                 if (r.serviceType == ServiceType.fuelDelivery && r.liters != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.local_gas_station_outlined, size: 20),
-                      const SizedBox(width: 8),
-                      Text('${r.liters} L ${r.fuelType ?? ''}'),
-                    ],
-                  ),
+                  const SizedBox(height: 12),
+                  _InfoRow(icon: Icons.local_gas_station_outlined, text: '${r.liters} L ${r.fuelType ?? ''}'),
                 ],
                 if (r.vehicleLabel != null) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: const Color(0xfff8fafc),
+                      color: Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.directions_car_outlined, color: Colors.grey, size: 20),
+                        Icon(Icons.directions_car_outlined, color: Colors.grey.shade600, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             r.vehicleLabel!,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey.shade800),
                           ),
                         ),
                       ],
@@ -889,13 +957,13 @@ class _RequestCardState extends State<_RequestCard> {
                   ),
                 ],
                 if (r.notes.isNotEmpty) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Text(
                     'Note: ${r.notes}',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
                   ),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -913,17 +981,18 @@ class _RequestCardState extends State<_RequestCard> {
                     },
                     icon: const Icon(Icons.info_outline, color: _brandRed),
                     label: const Text(
-                      'View Details',
+                      'View Full Details',
                       style: TextStyle(
                         color: _brandRed,
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: _brandRed),
+                      side: BorderSide(color: _brandRed.withValues(alpha: 0.3)),
+                      backgroundColor: _brandRed.withValues(alpha: 0.05),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                   ),
@@ -935,16 +1004,16 @@ class _RequestCardState extends State<_RequestCard> {
                       child: OutlinedButton(
                         onPressed: _busy ? null : widget.onDecline,
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          side: BorderSide(color: Colors.grey.shade400),
+                          side: BorderSide(color: Colors.grey.shade300),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Decline',
                           style: TextStyle(
-                            color: Colors.black87,
+                            color: Colors.grey.shade700,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -958,11 +1027,12 @@ class _RequestCardState extends State<_RequestCard> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _brandRed,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          elevation: 0,
+                          elevation: 2,
+                          shadowColor: _brandRed.withValues(alpha: 0.4),
                         ),
                         child: _busy
                             ? const SizedBox(
@@ -993,57 +1063,107 @@ class _RequestCardState extends State<_RequestCard> {
   }
 }
 
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _InfoRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: Colors.grey.shade600, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.4),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Small shared widgets
 // ---------------------------------------------------------------------------
 class _Summary extends StatelessWidget {
   final String label;
   final String value;
-  final bool red;
+  final IconData icon;
+  final bool highlight;
   final bool green;
   const _Summary({
     required this.label,
     required this.value,
-    this.red = false,
+    required this.icon,
+    this.highlight = false,
     this.green = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.grey.shade200),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.shade100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        color: Colors.white,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: highlight ? _brandRed.withValues(alpha: 0.1) : (green ? Colors.teal.withValues(alpha: 0.1) : Colors.grey.shade100),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 16,
+                    color: highlight ? _brandRed : (green ? Colors.teal : Colors.grey.shade700),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: red
-                      ? _brandRed
-                      : (green ? Colors.teal : Colors.black),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: highlight
+                    ? _brandRed
+                    : (green ? Colors.teal : Colors.black87),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1059,54 +1179,82 @@ class JobHistoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final done = job.status == RequestStatus.completed;
     final when = done ? job.completedAt : job.createdAt;
-    return Card(
-      elevation: 0,
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      color: Colors.white,
-      child: ListTile(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ProviderJobPage(requestId: job.id),
-            ),
-          );
-        },
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.red.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            done ? Icons.check_circle_outline : Icons.cancel_outlined,
-            color: _brandRed,
-          ),
-        ),
-        title: Text(
-          serviceTypeTitle(job.serviceType),
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-        ),
-        subtitle: Text(
-          '${formatWhen(when)} - ${money(job.totalAmount)}',
-          style: const TextStyle(color: Colors.grey, fontSize: 13),
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: statusColor(job.status).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(
-            statusLabel(job.status),
-            style: TextStyle(
-              color: statusColor(job.status),
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ProviderJobPage(requestId: job.id),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: (done ? Colors.green : Colors.grey).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    done ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                    color: done ? Colors.green : Colors.grey,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        serviceTypeTitle(job.serviceType),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${formatWhen(when)} • ${money(job.totalAmount)}',
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor(job.status).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    statusLabel(job.status).toUpperCase(),
+                    style: TextStyle(
+                      color: statusColor(job.status),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 10,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

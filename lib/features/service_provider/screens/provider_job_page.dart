@@ -18,9 +18,6 @@ const Color _brandRed = Color(0xFFE30613);
 const String _appPackageName = 'com.example.roadside_assitance';
 const String _assistanceIcon = 'assets/images/assistance1.png';
 
-/// The provider's screen for one accepted request: map with the customer's
-/// live position and route, call / SMS, and the status flow
-/// accepted -> on the way -> arrived -> in progress -> completed.
 class ProviderJobPage extends StatefulWidget {
   final String requestId;
   const ProviderJobPage({super.key, required this.requestId});
@@ -77,7 +74,6 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     super.dispose();
   }
 
-  // ---------------- Data ----------------
   void _onJob(ServiceRequest? job) {
     if (!mounted) return;
     if (job == null) {
@@ -91,8 +87,6 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     setState(() => _job = job);
 
     if (!kActiveStatuses.contains(job.status) && !_refreshedAfterEnd) {
-      // Job finished or was cancelled by the customer: location sharing
-      // can now follow the availability switch again.
       _refreshedAfterEnd = true;
       ProviderLocationService.instance.refresh();
     }
@@ -122,7 +116,6 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     } catch (_) {}
   }
 
-  /// Where the provider is heading right now.
   LatLng? get _target {
     final j = _job;
     if (j == null) return null;
@@ -183,19 +176,18 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     );
   }
 
-  // ---------------- Actions ----------------
   void _snack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
   }
 
   Future<void> _launch(Uri uri, {LaunchMode mode = LaunchMode.platformDefault}) async {
     try {
-      if (!await launchUrl(uri, mode: mode)) _snack('Could not open that app');
+      if (!await launchUrl(uri, mode: mode)) _snack('Could not open app');
     } catch (_) {
-      _snack('Could not open that app');
+      _snack('Could not open app');
     }
   }
 
@@ -214,19 +206,19 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
   ({String label, RequestStatus next})? _nextAction(RequestStatus s) =>
       switch (s) {
         RequestStatus.accepted => (
-          label: 'Start driving to customer',
+          label: 'Start Driving',
           next: RequestStatus.onTheWay,
         ),
         RequestStatus.onTheWay => (
-          label: 'I have arrived',
+          label: 'I Have Arrived',
           next: RequestStatus.arrived,
         ),
         RequestStatus.arrived => (
-          label: 'Start service',
+          label: 'Start Service',
           next: RequestStatus.inProgress,
         ),
         RequestStatus.inProgress => (
-          label: 'Complete job',
+          label: 'Complete Job',
           next: RequestStatus.completed,
         ),
         _ => null,
@@ -239,7 +231,8 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Complete this job?'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Complete Job?', style: TextStyle(fontWeight: FontWeight.bold)),
           content: Text(
             job.paymentMethod == 'cash'
                 ? 'Collect ${money(job.totalAmount)} in cash from the customer before completing.'
@@ -248,11 +241,16 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Not yet'),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Complete', style: TextStyle(color: _brandRed)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Complete'),
             ),
           ],
         ),
@@ -279,18 +277,19 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel this job?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Cancel Job?', style: TextStyle(fontWeight: FontWeight.bold)),
         content: const Text(
           'The customer will be notified. Frequent cancellations can lower your rating.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Keep job'),
+            child: const Text('Keep Job'),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Cancel job', style: TextStyle(color: _brandRed)),
+            child: const Text('Cancel Job', style: TextStyle(color: _brandRed, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -309,25 +308,32 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
           padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
           decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Center(
-                child: Icon(Icons.check_circle, color: Colors.green, size: 72),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 60),
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               const Center(
                 child: Text(
                   'Service Completed!',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
               ),
               const SizedBox(height: 32),
-              const Text('SERVICE DETAILS', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-              const SizedBox(height: 12),
+              Text('SERVICE DETAILS', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w800, letterSpacing: 1.2, fontSize: 13)),
+              const SizedBox(height: 16),
               _row(Icons.build_circle_outlined, serviceTypeTitle(job.serviceType)),
               _row(Icons.location_on_outlined, job.pickupAddress),
               if (job.dropoffAddress != null && job.dropoffAddress!.isNotEmpty)
@@ -341,21 +347,31 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Final Price', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text(money(job.totalAmount), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _brandRed)),
+                  Text(money(job.totalAmount), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: _brandRed)),
                 ],
               ),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Payment Method', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                  Text(job.paymentMethod == 'cash' ? 'Cash in person' : job.paymentMethod, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+                  const Text('Payment Method', style: TextStyle(fontSize: 15, color: Colors.grey)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      job.paymentMethod == 'cash' ? 'Cash in person' : job.paymentMethod, 
+                      style: TextStyle(fontSize: 14, color: Colors.grey.shade700, fontWeight: FontWeight.w600)
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
-                height: 54,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.of(ctx).pop();
@@ -365,6 +381,8 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
                     backgroundColor: _brandRed,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 4,
+                    shadowColor: _brandRed.withValues(alpha: 0.4),
                   ),
                   child: const Text('Done', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
@@ -376,19 +394,20 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     );
   }
 
-  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     final job = _job;
     if (_missing) {
       return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: Text('This request no longer exists.')),
+        appBar: AppBar(backgroundColor: Colors.white, elevation: 0),
+        backgroundColor: Colors.white,
+        body: const Center(child: Text('This request no longer exists.', style: TextStyle(color: Colors.grey))),
       );
     }
     if (job == null) {
       return Scaffold(
-        appBar: AppBar(),
+        backgroundColor: Colors.white,
+        appBar: AppBar(backgroundColor: Colors.white, elevation: 0),
         body: const Center(child: CircularProgressIndicator(color: _brandRed)),
       );
     }
@@ -410,7 +429,7 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
                 ),
                 SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 16, top: 8),
+                    padding: const EdgeInsets.only(left: 16, top: 12),
                     child: _circle(
                       Icons.chevron_left,
                       () => Navigator.of(context).pop(),
@@ -421,15 +440,18 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
                   child: Align(
                     alignment: Alignment.topRight,
                     child: Container(
-                      margin: const EdgeInsets.only(top: 4, right: 4),
+                      margin: const EdgeInsets.only(top: 12, right: 16),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
+                        horizontal: 8,
+                        vertical: 4,
                       ),
-                      color: Colors.white.withValues(alpha: 0.75),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       child: const Text(
-                        '© OpenStreetMap contributors',
-                        style: TextStyle(fontSize: 10, color: Colors.black87),
+                        '© OpenStreetMap',
+                        style: TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -437,7 +459,7 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
                 Positioned(
                   right: 16,
                   bottom: 46,
-                  child: _circle(Icons.my_location, _fit, size: 48),
+                  child: _circle(Icons.my_location, _fit, size: 48, iconSize: 24, color: _brandRed),
                 ),
               ],
             ),
@@ -448,18 +470,30 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     );
   }
 
-  Widget _circle(IconData icon, VoidCallback onTap, {double size = 40}) {
-    return Material(
-      color: Colors.white,
-      shape: const CircleBorder(),
-      elevation: 3,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Icon(icon, color: Colors.black87),
+  Widget _circle(IconData icon, VoidCallback onTap, {double size = 44, double iconSize = 24, Color color = Colors.black87}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: Icon(icon, color: color, size: iconSize),
+          ),
         ),
       ),
     );
@@ -492,7 +526,7 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
         if (_route.isNotEmpty)
           PolylineLayer(
             polylines: [
-              Polyline(points: _route, strokeWidth: 5, color: Colors.black),
+              Polyline(points: _route, strokeWidth: 5, color: _brandRed.withValues(alpha: 0.8)),
             ],
           ),
         MarkerLayer(
@@ -500,24 +534,24 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
           markers: [
             Marker(
               point: pickup,
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               alignment: Alignment.topCenter,
-              child: const Icon(Icons.location_on, color: _brandRed, size: 40),
+              child: const Icon(Icons.location_on, color: Colors.blue, size: 44),
             ),
             if (dropoff != null)
               Marker(
                 point: dropoff,
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 alignment: Alignment.topCenter,
-                child: const Icon(Icons.flag, color: Colors.black, size: 34),
+                child: const Icon(Icons.flag, color: Colors.black, size: 38),
               ),
             if (hasLive)
               Marker(
                 point: LatLng(live.latitude, live.longitude),
-                width: 34,
-                height: 34,
+                width: 36,
+                height: 36,
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.blue,
@@ -527,19 +561,29 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
                       BoxShadow(color: Colors.black26, blurRadius: 4),
                     ],
                   ),
-                  child: const Icon(Icons.person, color: Colors.white, size: 18),
+                  child: const Icon(Icons.person, color: Colors.white, size: 20),
                 ),
               ),
             if (_me != null)
               Marker(
                 point: _me!,
-                width: 34,
-                height: 34,
-                child: Image.asset(
-                  _assistanceIcon,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) =>
-                      const Icon(Icons.local_shipping, color: _brandRed, size: 28),
+                width: 40,
+                height: 40,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8),
+                    ],
+                  ),
+                  child: Image.asset(
+                    _assistanceIcon,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.local_shipping, color: _brandRed, size: 24),
+                  ),
                 ),
               ),
           ],
@@ -550,103 +594,106 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
 
   Widget _buildSheet(ServiceRequest job) {
     final bottom = MediaQuery.of(context).padding.bottom;
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.62,
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.65),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + bottom),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 15,
-              offset: const Offset(0, -3),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 50,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(3),
             ),
-          ],
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _progress(job.status),
-              const SizedBox(height: 14),
-              Row(
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      serviceTypeTitle(job.serviceType),
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
+                  _progress(job.status),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          serviceTypeTitle(job.serviceType),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor(job.status).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(
-                      statusLabel(job.status),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: statusColor(job.status),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor(job.status).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          statusLabel(job.status),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: statusColor(job.status),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
+                  const SizedBox(height: 24),
+                  _customerCard(job),
+                  const SizedBox(height: 24),
+                  _row(Icons.location_on_outlined, job.pickupAddress, iconColor: Colors.blue),
+                  if (job.dropoffAddress != null && job.dropoffAddress!.isNotEmpty)
+                    _row(Icons.flag_outlined, 'Drop-off: ${job.dropoffAddress}', iconColor: Colors.black87),
+                  if (kActiveStatuses.contains(job.status) &&
+                      _routeKm != null &&
+                      _routeMin != null)
+                    _row(
+                      Icons.alt_route,
+                      '${_routeKm!.toStringAsFixed(1)} km - about $_routeMin min away',
+                      iconColor: _brandRed,
+                    ),
+                  if (job.vehicleLabel != null)
+                    _row(Icons.directions_car_outlined, job.vehicleLabel!),
+                  if (job.serviceType == ServiceType.fuelDelivery && job.liters != null)
+                    _row(
+                      Icons.local_gas_station_outlined,
+                      '${job.liters} L ${job.fuelType ?? ''}',
+                    ),
+                  if (job.notes.isNotEmpty)
+                    _row(Icons.sticky_note_2_outlined, 'Note: ${job.notes}', iconColor: Colors.orange.shade700),
+                  _row(
+                    Icons.payments_outlined,
+                    '${money(job.totalAmount)} - ${job.paymentMethod == 'cash' ? 'Cash' : job.paymentMethod}',
+                    iconColor: Colors.green,
+                  ),
+                  const SizedBox(height: 24),
+                  ..._actions(job),
                 ],
               ),
-              const SizedBox(height: 14),
-              _customerCard(job),
-              const SizedBox(height: 14),
-              _row(Icons.location_on_outlined, job.pickupAddress),
-              if (job.dropoffAddress != null && job.dropoffAddress!.isNotEmpty)
-                _row(Icons.flag_outlined, 'Drop-off: ${job.dropoffAddress}'),
-              if (kActiveStatuses.contains(job.status) &&
-                  _routeKm != null &&
-                  _routeMin != null)
-                _row(
-                  Icons.alt_route,
-                  '${_routeKm!.toStringAsFixed(1)} km - about $_routeMin min away',
-                ),
-              if (job.vehicleLabel != null)
-                _row(Icons.directions_car_outlined, job.vehicleLabel!),
-              if (job.serviceType == ServiceType.fuelDelivery && job.liters != null)
-                _row(
-                  Icons.local_gas_station_outlined,
-                  '${job.liters} L ${job.fuelType ?? ''}',
-                ),
-              if (job.notes.isNotEmpty)
-                _row(Icons.sticky_note_2_outlined, job.notes),
-              _row(
-                Icons.payments_outlined,
-                '${money(job.totalAmount)} - ${job.paymentMethod == 'cash' ? 'Cash in person' : job.paymentMethod}',
-              ),
-              const SizedBox(height: 16),
-              ..._actions(job),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -662,13 +709,13 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     return Row(
       children: [
         for (var i = 0; i < 4; i++) ...[
-          if (i > 0) const SizedBox(width: 6),
+          if (i > 0) const SizedBox(width: 8),
           Expanded(
             child: Container(
-              height: 4,
+              height: 6,
               decoration: BoxDecoration(
-                color: i < done ? _brandRed : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+                color: i < done ? _brandRed : Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
           ),
@@ -677,15 +724,27 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     );
   }
 
-  Widget _row(IconData icon, String text) {
+  Widget _row(IconData icon, String text, {Color iconColor = Colors.black54}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Colors.black87),
-          const SizedBox(width: 10),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(text, style: TextStyle(fontSize: 15, color: Colors.grey.shade800, fontWeight: FontWeight.w500)),
+            ),
+          ),
         ],
       ),
     );
@@ -698,22 +757,30 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     final canContact = phone.isNotEmpty && kActiveStatuses.contains(job.status);
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade300),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.grey.shade200,
+            radius: 26,
+            backgroundColor: Colors.grey.shade100,
             backgroundImage: photo.isNotEmpty ? NetworkImage(photo) : null,
             child: photo.isEmpty
-                ? Icon(Icons.person, color: Colors.grey.shade500)
+                ? Icon(Icons.person, color: Colors.grey.shade400, size: 28)
                 : null,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -723,27 +790,31 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (phone.isNotEmpty)
+                if (phone.isNotEmpty) ...[
+                  const SizedBox(height: 2),
                   Text(
                     phone,
-                    style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
                   ),
+                ],
               ],
             ),
           ),
           if (canContact) ...[
             _contactButton(
-              Icons.sms_outlined,
+              Icons.chat_bubble_outline_rounded,
               () => _launch(Uri(scheme: 'sms', path: phone)),
+              color: Colors.blue,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             _contactButton(
-              Icons.call,
+              Icons.phone_rounded,
               () => _launch(Uri(scheme: 'tel', path: phone)),
+              color: Colors.green,
               filled: true,
             ),
           ],
@@ -752,33 +823,35 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
     );
   }
 
-  Widget _contactButton(IconData icon, VoidCallback onTap, {bool filled = false}) {
-    return Material(
-      color: filled ? _brandRed : Colors.white,
-      shape: CircleBorder(
-        side: BorderSide(color: filled ? _brandRed : Colors.grey.shade400),
+  Widget _contactButton(IconData icon, VoidCallback onTap, {bool filled = false, required Color color}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: filled ? color : color.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
       ),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 42,
-          height: 42,
-          child: Icon(icon, size: 20, color: filled ? Colors.white : Colors.black87),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(icon, size: 20, color: filled ? Colors.white : color),
+          ),
         ),
       ),
     );
   }
 
   List<Widget> _actions(ServiceRequest job) {
-    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(30));
-
     if (job.status == RequestStatus.completed) {
       return [
-        _banner(Icons.check_circle, Colors.green, 'Job completed',
-            'You earned ${money(job.totalAmount)}.'),
-        const SizedBox(height: 12),
-        _primary('Done', () => Navigator.of(context).pop(), shape),
+        _banner(Icons.check_circle_outline, Colors.green, 'Job Completed',
+            'You earned ${money(job.totalAmount)}. Great work!'),
+        const SizedBox(height: 16),
+        _primary('Back to Home', () => Navigator.of(context).pop()),
       ];
     }
     if (job.status == RequestStatus.cancelled ||
@@ -786,120 +859,123 @@ class _ProviderJobPageState extends State<ProviderJobPage> {
       return [
         _banner(
           Icons.cancel_outlined,
-          Colors.grey,
+          Colors.grey.shade600,
           job.cancelledBy == 'customer'
-              ? 'The customer cancelled this request'
-              : 'This job was cancelled',
+              ? 'Customer Cancelled'
+              : 'Job Cancelled',
           'You are free to take new requests.',
         ),
-        const SizedBox(height: 12),
-        _primary('Back to home', () => Navigator.of(context).pop(), shape),
+        const SizedBox(height: 16),
+        _primary('Back to Home', () => Navigator.of(context).pop(), isSecondary: true),
       ];
     }
 
     final next = _nextAction(job.status);
+    if (next == null) return [];
+    
     return [
-      if (next != null)
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            onPressed: _busy ? null : () => _advance(job, next.next),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _brandRed,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: shape,
+      if (job.status == RequestStatus.accepted || job.status == RequestStatus.onTheWay)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: _navigateExternally,
+              icon: const Icon(Icons.navigation_rounded),
+              label: const Text('Open in Google Maps', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue.shade700,
+                side: BorderSide(color: Colors.blue.shade200),
+                backgroundColor: Colors.blue.shade50,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
             ),
-            child: _busy
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text(
-                    next.label,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
           ),
         ),
-      const SizedBox(height: 10),
-      SizedBox(
-        width: double.infinity,
-        height: 48,
-        child: OutlinedButton.icon(
-          onPressed: _navigateExternally,
-          icon: const Icon(Icons.navigation_outlined, size: 20),
-          label: const Text('Open in Google Maps'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.black87,
-            side: BorderSide(color: Colors.grey.shade400),
-            shape: shape,
-          ),
-        ),
-      ),
-      if (job.status != RequestStatus.inProgress)
-        TextButton(
-          onPressed: _busy ? null : () => _cancelJob(job),
-          child: const Text(
-            'Cancel job',
-            style: TextStyle(color: Colors.black54),
-          ),
-        ),
-    ];
-  }
-
-  Widget _banner(IconData icon, Color color, String title, String sub) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
+      Row(
         children: [
-          Icon(icon, color: color, size: 32),
-          const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            child: _primary(
+              next.label,
+              () => _advance(job, next.next),
+              isLoading: _busy,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            height: 54,
+            width: 54,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: _busy ? null : () => _cancelJob(job),
+                child: Center(
+                  child: Icon(Icons.close_rounded, color: Colors.red.shade600),
                 ),
-                Text(sub, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
-              ],
+              ),
             ),
           ),
         ],
       ),
+    ];
+  }
+
+  Widget _primary(String label, VoidCallback onTap, {bool isLoading = false, bool isSecondary = false}) {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton(
+        onPressed: isLoading ? null : onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isSecondary ? Colors.grey.shade200 : _brandRed,
+          foregroundColor: isSecondary ? Colors.black87 : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: isSecondary ? 0 : 4,
+          shadowColor: isSecondary ? Colors.transparent : _brandRed.withValues(alpha: 0.4),
+        ),
+        child: isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+              )
+            : Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      ),
     );
   }
 
-  Widget _primary(String label, VoidCallback onTap, RoundedRectangleBorder shape) {
-    return SizedBox(
+  Widget _banner(IconData icon, Color color, String title, String subtitle) {
+    return Container(
       width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _brandRed,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: shape,
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 32),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text(subtitle, style: TextStyle(color: Colors.grey.shade700, fontSize: 14)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -10,7 +10,6 @@ import 'provider_ui_helpers.dart';
 
 const Color _brandRed = Color(0xFFE30613);
 
-/// "Job" tab: the active job on top, then completed / cancelled history.
 class ProviderJobsPage extends StatefulWidget {
   const ProviderJobsPage({super.key});
 
@@ -32,33 +31,11 @@ class _ProviderJobsPageState extends State<ProviderJobsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xfff8fafc),
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  const Text(
-                    'My Jobs',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      icon: const Icon(Icons.chevron_left),
-                      style: IconButton.styleFrom(
-                        side: BorderSide(color: Colors.grey.shade300),
-                        shape: const CircleBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _buildHeader(context),
             Expanded(
               child: _stream == null
                   ? const Center(child: Text('Please sign in again.'))
@@ -69,7 +46,7 @@ class _ProviderJobsPageState extends State<ProviderJobsPage> {
                           return const Center(child: Text('Unable to load jobs.'));
                         }
                         if (!snap.hasData) {
-                          return const Center(child: CircularProgressIndicator());
+                          return const Center(child: CircularProgressIndicator(color: _brandRed));
                         }
                         final jobs = snap.data!;
                         final active = jobs
@@ -88,18 +65,26 @@ class _ProviderJobsPageState extends State<ProviderJobsPage> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.assignment_outlined,
-                                      size: 90, color: Colors.grey.shade400),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'No jobs yet',
-                                    style: TextStyle(
-                                        fontSize: 19, fontWeight: FontWeight.bold),
+                                  Container(
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.assignment_outlined,
+                                        size: 80, color: Colors.grey.shade400),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 24),
+                                  const Text(
+                                    'No Jobs Yet',
+                                    style: TextStyle(
+                                        fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                                  ),
+                                  const SizedBox(height: 12),
                                   Text(
-                                    'Accepted jobs will appear here.',
-                                    style: TextStyle(color: Colors.grey.shade500),
+                                    'Accepted jobs and your history will appear here.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.grey.shade500, fontSize: 15),
                                   ),
                                 ],
                               ),
@@ -108,31 +93,33 @@ class _ProviderJobsPageState extends State<ProviderJobsPage> {
                         }
 
                         return ListView(
-                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
                           children: [
                             if (active.isNotEmpty) ...[
-                              const Text(
-                                'ACTIVE',
+                              Text(
+                                'ACTIVE JOBS',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.grey,
+                                  letterSpacing: 1.2,
+                                  color: Colors.grey.shade500,
                                 ),
                               ),
-                              const SizedBox(height: 10),
-                              for (final j in active) _ActiveTile(job: j),
                               const SizedBox(height: 16),
+                              for (final j in active) _ActiveTile(job: j),
+                              const SizedBox(height: 24),
                             ],
                             if (history.isNotEmpty) ...[
-                              const Text(
+                              Text(
                                 'HISTORY',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.grey,
+                                  letterSpacing: 1.2,
+                                  color: Colors.grey.shade500,
                                 ),
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 16),
                               for (final j in history) JobHistoryTile(job: j),
                             ],
                           ],
@@ -149,6 +136,35 @@ class _ProviderJobsPageState extends State<ProviderJobsPage> {
       ),
     );
   }
+
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+      ),
+      child: Row(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.chevron_left, color: Colors.black87),
+            ),
+          ),
+          const SizedBox(width: 16),
+          const Text(
+            'My Jobs',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ActiveTile extends StatelessWidget {
@@ -157,29 +173,87 @@ class _ActiveTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: _brandRed, width: 1.5),
+        border: Border.all(color: _brandRed.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: _brandRed.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: ListTile(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ProviderJobPage(requestId: job.id)),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => ProviderJobPage(requestId: job.id)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _brandRed.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.local_shipping_outlined, color: _brandRed, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        serviceTypeTitle(job.serviceType),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: statusColor(job.status).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              statusLabel(job.status).toUpperCase(),
+                              style: TextStyle(
+                                color: statusColor(job.status),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 9,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              job.pickupAddress,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey, size: 18),
+              ],
+            ),
+          ),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: const Icon(Icons.local_shipping_outlined, color: _brandRed, size: 30),
-        title: Text(
-          serviceTypeTitle(job.serviceType),
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-        ),
-        subtitle: Text(
-          '${statusLabel(job.status)} - ${job.pickupAddress}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }
