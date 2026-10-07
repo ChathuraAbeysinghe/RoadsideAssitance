@@ -17,13 +17,23 @@ const String _searchMagnifierImage = 'assets/images/search-magnifier.png';
 const String _assistanceIcon = 'assets/images/assistance1.png';
 const String _appPackageName = 'com.example.roadside_assitance';
 
+/// Search radius for each stage (one per progress bar):
+/// stage 0 -> 5 km, stage 1 -> 10 km, stage 2 -> 15 km.
+const List<double> _stageRadiiKm = [5, 10, 15];
+
+/// TODO: set this to the Firestore collection your requests live in.
+/// It's used to widen `searchRadiusKm` on the request document so providers
+/// further away start seeing it. If you already have a helper for this in
+/// service_request.dart, call that instead of [_updateRadiusInFirestore].
+const String _requestsCollection = 'service_requests';
+
 /// Padding used when fitting the search circle into the visible map.
 /// The map is laid out 30px taller than what's visible (it extends under
 /// the sheet), so the bottom is 30 larger to keep the pin truly centered.
 const EdgeInsets _mapFitPadding = EdgeInsets.fromLTRB(40, 40, 40, 70);
 
 /// Shown after the customer confirms. Listens to the request document:
-///  - pending  -> searching UI, widening the radius every stage
+///  - pending  -> searching UI, widening the radius every stage (5/10/15 km)
 ///  - accepted (or later) -> provider details
 ///  - expired  -> "no assistance found" with Try again
 class RequestSearchingPage extends StatefulWidget {
@@ -80,6 +90,9 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
 
   int get _stageSeconds => kSearchTimeout.inSeconds ~/ 3;
 
+  /// Current search radius, driven by the stage (5 -> 10 -> 15 km).
+  double get _currentRadiusKm => _stageRadiiKm[_stage];
+
   @override
   void initState() {
     super.initState();
@@ -120,7 +133,10 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
       _providerFuture ??= _loadProvider(r.providerUid!);
     }
     if (r.status != RequestStatus.pending) {
-      if (r.status == RequestStatus.accepted || r.status == RequestStatus.onTheWay || r.status == RequestStatus.arrived || r.status == RequestStatus.inProgress) {
+      if (r.status == RequestStatus.accepted ||
+          r.status == RequestStatus.onTheWay ||
+          r.status == RequestStatus.arrived ||
+          r.status == RequestStatus.inProgress) {
         _sharer.start(r.id);
       } else {
         _sharer.stop();
@@ -150,6 +166,19 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     return userFromMap(uid, data);
   }
 
+  /// Widens (or resets) the radius stored on the request so providers
+  /// further away can see it.
+  Future<void> _updateRadiusInFirestore(double km) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection(_requestsCollection)
+          .doc(widget.requestId)
+          .update({'searchRadiusKm': km});
+    } catch (_) {
+      // Non-fatal: the map still widens locally.
+    }
+  }
+
   void _startTimer() {
     _timer?.cancel();
     _elapsedSeconds = 0;
@@ -169,10 +198,13 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
 
       final newStage = (_elapsedSeconds ~/ _stageSeconds).clamp(
         0,
-        2,
+        _stageRadiiKm.length - 1,
       );
       if (newStage != _stage) {
         setState(() => _stage = newStage);
+        // Zoom out to show the wider search area and tell providers.
+        _fitMapToRadius();
+        _updateRadiusInFirestore(_currentRadiusKm);
       }
     });
   }
@@ -194,10 +226,9 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
   }
 
   void _fitMapToRadius() {
-    final r = _request?.searchRadiusKm ?? 5.0;
     _mapController.fitCamera(
       CameraFit.coordinates(
-        coordinates: _radiusExtent(r),
+        coordinates: _radiusExtent(_currentRadiusKm),
         padding: _mapFitPadding,
       ),
     );
@@ -245,6 +276,8 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
       final renewed = await renewRequest(widget.requestId);
       if (!renewed || !mounted) return;
       setState(() => _stage = 0);
+      // Start over from the smallest radius.
+      _updateRadiusInFirestore(_currentRadiusKm);
       _fitMapToRadius();
       _startTimer();
       _radarAnim.repeat();
@@ -533,7 +566,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
   }
 
   Widget _buildMap() {
-    final radiusKm = _request?.searchRadiusKm ?? 5.0;
+    final radiusKm = _currentRadiusKm;
     final searching = _status == RequestStatus.pending;
     return FlutterMap(
       mapController: _mapController,
@@ -664,7 +697,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
         ),
         const SizedBox(height: 6),
         Text(
-          'Searching within ${(_request?.searchRadiusKm ?? 5.0).toStringAsFixed(0)} km…',
+          'Searching within ${_currentRadiusKm.toStringAsFixed(0)} km…',
           style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 20),
@@ -765,7 +798,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
       builder: (context, elapsed, _) {
         return Row(
           children: [
-            for (var i = 0; i < 3; i++) ...[
+            for (var i = 0; i < _stageRadiiKm.length; i++) ...[
               if (i > 0) const SizedBox(width: 8),
               Expanded(child: _stageBar(i, elapsed)),
             ],

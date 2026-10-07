@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -30,7 +31,13 @@ class _ServiceConfig {
 
 const String _placeholderIcon = 'assets/images/pickup-point.png';
 const String _pickupPinPath = 'assets/images/pickup-point.png';
-const String _assistanceIcon = 'assets/images/assistance1.png';
+const String _dropoffPinPath = 'assets/images/dropoff-point.png';
+
+const Color _dropoffOrange = Color(0xFFFF8C00);
+
+/// The search always starts at this radius. The searching page widens it
+/// to 10 km and then 15 km if nobody accepts.
+const double _initialSearchRadiusKm = 5.0;
 
 String _iconAssetFor(VehicleType type) => switch (type) {
   VehicleType.car => 'assets/images/vehicle-car.png',
@@ -186,6 +193,12 @@ enum _PickTarget { pickup, dropoff }
 
 enum _FuelType { petrol, diesel }
 
+/// Where the user is in the flow:
+///  pickingPickup  -> pin in the middle of the map, "Confirm pickup point"
+///  pickingDropoff -> same, for the drop-off (tow truck only)
+///  details        -> normal sheet (vehicle, fuel, fields) + "Confirm"
+enum _Phase { pickingPickup, pickingDropoff, details }
+
 class RequestServicePage extends StatefulWidget {
   final ServiceType serviceType;
   final UserType userType;
@@ -208,6 +221,11 @@ class _RequestServicePageState extends State<RequestServicePage>
   // don't show a white gap.
   static const double _mapUnderlap = 30;
 
+  // Centre pin size / how far it lifts while the map is being moved.
+  static const double _pinW = 44;
+  static const double _pinH = 54;
+  static const double _pinLift = 18;
+
   // Malabe fallback until live location is available.
   static final LatLng _initialCenter = LatLng(6.9061, 79.9697);
 
@@ -215,8 +233,25 @@ class _RequestServicePageState extends State<RequestServicePage>
   final _pickupController = TextEditingController();
   final _dropoffController = TextEditingController();
 
+  _Phase _phase = _Phase.pickingPickup;
   _PickTarget _activeField = _PickTarget.pickup;
-  bool _pickingOnMap = false;
+
+  /// True once the user has confirmed all required points at least once.
+  /// From then on "back" while re-picking returns to the details sheet.
+  bool _reachedDetails = false;
+
+  bool _mapReady = false;
+  bool _userTouchedMap = false;
+
+  /// True while the user is dragging/flinging the map (pin lifted, dot shown).
+  /// A notifier so only the pin / confirm button rebuild, not the whole page.
+  final ValueNotifier<bool> _moving = ValueNotifier<bool>(false);
+  Timer? _settleTimer;
+
+  /// Point under the centre pin once the map has stopped, and its address.
+  LatLng? _pendingPoint;
+  String? _pendingAddress;
+  int _pendingToken = 0;
 
   LatLng? _pickup;
   LatLng? _dropoff;
@@ -228,27 +263,17 @@ class _RequestServicePageState extends State<RequestServicePage>
   // Live user location
   LatLng? _userLocation;
   double _userAccuracy = 0;
+  double? _heading; // degrees clockwise from north; last known while moving
   bool _locatingUser = true;
   bool _hasCenteredOnUser = false;
   StreamSubscription<Position>? _positionSub;
   bool _trackingActive = false;
-
-  // Live nearby assistance providers shown on the map.
-  StreamSubscription<List<NearbyProvider>>? _providersSub;
-  List<NearbyProvider> _providers = const [];
-
-  // Provider whose info card is open, and a cache of loaded details
-  // (name, rating, phone, photo).
-  String? _selectedUid;
-  final Map<String, Future<AppUser?>> _providerDetails = {};
 
   // Fuel delivery options
   int _liters = 5; // last valid value
   _FuelType _fuelType = _FuelType.petrol;
   final _litersController = TextEditingController(text: '5');
   final _litersFocus = FocusNode();
-
-  double _searchRadius = 5.0;
 
   // Vehicle for this request (user's active vehicle by default)
   Vehicle? _vehicle;
@@ -272,12 +297,13 @@ class _RequestServicePageState extends State<RequestServicePage>
   /// Services that show the vehicle button.
   bool get _usesVehicle => _isTow || _isMechanic;
 
+  bool get _isPicking => _phase != _Phase.details;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadActiveVehicle();
-    _watchProviders();
     // When the amount field loses focus, restore a valid value if it's
     // empty or 0.
     _litersFocus.addListener(() {
@@ -305,7 +331,8 @@ class _RequestServicePageState extends State<RequestServicePage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _providersSub?.cancel();
+    _settleTimer?.cancel();
+    _moving.dispose();
     _litersController.dispose();
     _litersFocus.dispose();
     _positionSub?.cancel();
@@ -315,256 +342,87 @@ class _RequestServicePageState extends State<RequestServicePage>
     super.dispose();
   }
 
-  // ---------------- Nearby providers ----------------
-  void _watchProviders() {
-    _providersSub = watchNearbyProviders(widget.serviceType).listen((list) {
-      if (mounted) setState(() => _providers = list);
-    }, onError: (_) {});
-  }
-
-  Future<AppUser?> _loadProvider(String uid) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .get();
-    final data = doc.data();
-    if (data == null) return null;
-    return userFromMap(uid, data);
-  }
-
-  Widget _buildProviderMarkers(double radiusM) {
-    const distance = Distance();
-    final center = _pickup ?? _userLocation ?? _initialCenter;
-
-    final nearby = _providers.where((p) {
-      final point = LatLng(p.location.latitude, p.location.longitude);
-      return distance.as(LengthUnit.Meter, center, point) <= radiusM;
-    }).toList();
-
-    NearbyProvider? selected;
-    for (final p in nearby) {
-      if (p.uid == _selectedUid) selected = p;
-    }
-
-    return MarkerLayer(
-      markers: [
-        for (final p in nearby)
-          Marker(
-            key: ValueKey(p.uid),
-            point: LatLng(p.location.latitude, p.location.longitude),
-            width: 30,
-            height: 30,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _selectedUid = p.uid),
-              child: Image.asset(
-                _assistanceIcon,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.local_shipping,
-                  color: _brandRed,
-                  size: 20,
-                ),
-              ),
-            ),
-          ),
-        // Info card, added last so it draws on top. It sits just above the
-        // tapped icon, like an info window on Google Maps.
-        if (selected != null)
-          Marker(
-            key: ValueKey('card-${selected.uid}'),
-            point: LatLng(
-              selected.location.latitude,
-              selected.location.longitude,
-            ),
-            width: 240,
-            height: 130,
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _buildProviderCard(selected.uid),
-                const SizedBox(height: 26), // clears the icon
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildProviderCard(String uid) {
-    return GestureDetector(
-      // Swallow taps so touching the card doesn't close it.
-      onTap: () {},
-      child: Container(
-        width: 230,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: FutureBuilder<AppUser?>(
-          future: _providerDetails.putIfAbsent(uid, () => _loadProvider(uid)),
-          builder: (context, snap) {
-            if (snap.connectionState != ConnectionState.done) {
-              return const SizedBox(
-                height: 44,
-                child: Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              );
-            }
-            final user = snap.data;
-            if (user == null) {
-              return const SizedBox(
-                height: 44,
-                child: Center(child: Text('Details unavailable')),
-              );
-            }
-            return _providerCardContent(user);
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _providerCardContent(AppUser user) {
-    final fallbackAvatar = ColoredBox(
-      color: Colors.grey.shade300,
-      child: Icon(Icons.person, color: Colors.grey.shade600),
-    );
-    final hasPhoto = user.profileImagePath.isNotEmpty;
-    final rating = user.rating;
-
-    return Row(
-      children: [
-        ClipOval(
-          child: SizedBox(
-            width: 46,
-            height: 46,
-            child: hasPhoto
-                ? Image.network(
-                    user.profileImagePath,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => fallbackAvatar,
-                    loadingBuilder: (context, child, progress) =>
-                        progress == null ? child : fallbackAvatar,
-                  )
-                : fallbackAvatar,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                user.name.isEmpty ? 'Assistance' : user.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  const Icon(Icons.star, size: 15, color: Colors.amber),
-                  const SizedBox(width: 3),
-                  Text(
-                    rating.count > 0
-                        ? '${rating.average.toStringAsFixed(1)} (${rating.count})'
-                        : 'No ratings yet',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    // Back leaves the page only from the first pickup step or the details
+    // sheet; in between it steps back through the flow.
+    final canPop =
+        _phase == _Phase.details ||
+        (_phase == _Phase.pickingPickup && !_reachedDetails);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          // Map area: top part of the screen, or full screen while picking.
-          Expanded(
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Map runs slightly under the sheet (paints beneath it).
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: -_mapUnderlap,
-                  child: _buildMap(),
-                ),
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 16, top: 8),
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onBack();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Map runs slightly under the sheet (paints beneath it).
+                  // The centre pin lives in the same box so it sits exactly
+                  // on the map's centre.
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: -_mapUnderlap,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _buildMap(),
+                        if (_isPicking) _buildCenterPin(),
+                      ],
+                    ),
+                  ),
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 16, top: 8),
+                      child: _circleButton(
+                        icon: Icons.chevron_left,
+                        onTap: _onBack,
+                      ),
+                    ),
+                  ),
+                  // OpenStreetMap requires visible attribution.
+                  SafeArea(
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 4, right: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        color: Colors.white.withValues(alpha: 0.75),
+                        child: const Text(
+                          '© OpenStreetMap contributors',
+                          style: TextStyle(fontSize: 10, color: Colors.black87),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 16,
+                    bottom: 16 + _mapUnderlap,
                     child: _circleButton(
-                      icon: Icons.chevron_left,
-                      onTap: () => Navigator.of(context).pop(),
+                      icon: Icons.my_location,
+                      size: 52,
+                      onTap: _goToMyLocation,
                     ),
                   ),
-                ),
-                // OpenStreetMap requires visible attribution.
-                SafeArea(
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 4, right: 4),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      color: Colors.white.withValues(alpha: 0.75),
-                      child: const Text(
-                        '© OpenStreetMap contributors',
-                        style: TextStyle(fontSize: 10, color: Colors.black87),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_pickingOnMap) _buildPickingBanner(),
-                Positioned(
-                  right: 16,
-                  bottom: _pickingOnMap ? 24 + bottomInset : 16 + _mapUnderlap,
-                  child: _circleButton(
-                    icon: Icons.my_location,
-                    size: 52,
-                    onTap: _goToMyLocation,
-                  ),
-                ),
-                if (_locatingUser) _buildLocatingOverlay(),
-              ],
+                  if (_locatingUser) _buildLocatingOverlay(),
+                ],
+              ),
             ),
-          ),
-          // Hide the sheet while picking so the whole map is visible.
-          if (!_pickingOnMap) _buildSheet(),
-        ],
+            _isPicking ? _buildPickBar() : _buildSheet(),
+          ],
+        ),
       ),
     );
   }
@@ -575,20 +433,27 @@ class _RequestServicePageState extends State<RequestServicePage>
       options: MapOptions(
         initialCenter: _initialCenter,
         initialZoom: 15,
-        onMapReady: _startLocationTracking,
-        onTap: (_, point) {
-          // Tapping the map also closes any open provider info card.
-          if (_selectedUid != null) setState(() => _selectedUid = null);
-          _onMapTap(point);
+        // Rotation stays off so the heading cone always points correctly.
+        interactionOptions: InteractionOptions(
+          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        ),
+        onMapReady: () {
+          _mapReady = true;
+          _startLocationTracking();
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _updatePendingFromCenter(),
+          );
         },
+        onPositionChanged: (camera, hasGesture) =>
+            _onMapPositionChanged(hasGesture),
       ),
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: _appPackageName,
         ),
-        // GPS accuracy circle
-        if (_pickingOnMap && _userLocation != null && _userAccuracy > 0)
+        // GPS accuracy circle (only while choosing a point)
+        if (_isPicking && _userLocation != null && _userAccuracy > 0)
           CircleLayer(
             circles: [
               CircleMarker(
@@ -611,72 +476,142 @@ class _RequestServicePageState extends State<RequestServicePage>
               ),
             ],
           ),
-        // rotate: true keeps the pins upright when the map is rotated.
+        // rotate: true keeps the markers upright.
         MarkerLayer(
           rotate: true,
           markers: [
-            // Live user location (blue dot), only shown while picking on the
-            // map. Drawn first so pins sit on top.
-            if (_pickingOnMap && _userLocation != null)
+            // Live user location: blue dot with a cone showing the direction
+            // they are facing (same as the tracking page). Drawn first so the
+            // pins sit on top.
+            if (_userLocation != null)
               Marker(
                 point: _userLocation!,
-                width: 22,
-                height: 22,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.blue,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black26, blurRadius: 4),
-                    ],
-                  ),
-                ),
+                width: 64,
+                height: 64,
+                child: _HeadingDot(heading: _heading),
               ),
-            if (_pickup != null)
-              Marker(
+            // Confirmed points. The one currently being picked is hidden:
+            // the centre pin stands in for it.
+            if (_pickup != null && _phase != _Phase.pickingPickup)
+              _dotMarker(
                 point: _pickup!,
-                width: 40,
-                height: 48,
-                // Pin tip sits on the exact coordinate.
-                alignment: Alignment.topCenter,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _startRepick(_PickTarget.pickup),
-                  child: Image.asset(
-                    _pickupPinPath,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.location_on,
-                      color: Colors.green,
-                      size: 40,
-                    ),
-                  ),
-                ),
+                // Towing shows Pickup; every other service has a single
+                // point shown as "Delivery". Both are red.
+                tag: _isTow ? 'Pickup' : 'Delivery',
+                tagColor: _brandRed,
+                dotColor: _brandRed,
+                address: _pickupController.text,
+                onTap: () => _startRepick(_PickTarget.pickup),
               ),
-            if (_dropoff != null)
-              Marker(
+            if (_dropoff != null && _phase != _Phase.pickingDropoff)
+              _dotMarker(
                 point: _dropoff!,
-                width: 40,
-                height: 40,
-                alignment: Alignment.topCenter,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _startRepick(_PickTarget.dropoff),
-                  child: const Icon(
-                    Icons.location_on,
-                    color: Color.fromARGB(255, 210, 0, 0),
-                    size: 40,
-                  ),
-                ),
+                tag: 'Drop',
+                tagColor: _dropoffOrange,
+                dotColor: _dropoffOrange,
+                address: _dropoffController.text,
+                onTap: () => _startRepick(_PickTarget.dropoff),
               ),
           ],
         ),
-        // Live nearby assistance. Last child so the info card draws on top.
-        // Hidden while picking so it can't swallow taps meant for choosing
-        // a location.
-        if (!_pickingOnMap) _buildProviderMarkers(_searchRadius * 1000),
       ],
+    );
+  }
+
+  /// Confirmed point: a plain dot (black for pickup, red for drop-off) centred
+  /// on the exact coordinate, with the address pill floating above it.
+  /// The pin images are only used while choosing a point. Tapping the dot
+  /// goes back to re-pick that point.
+  Marker _dotMarker({
+    required LatLng point,
+    required String tag,
+    required Color tagColor,
+    required Color dotColor,
+    required String address,
+    required VoidCallback onTap,
+  }) {
+    return Marker(
+      point: point,
+      width: 250,
+      height: 120,
+      child: _LabeledDot(
+        pill: _AddressPill(
+          tag: tag,
+          color: tagColor,
+          text: address.isEmpty ? '$tag point' : address,
+        ),
+        color: dotColor,
+        onTap: onTap,
+      ),
+    );
+  }
+
+  /// Pin fixed in the middle of the map while choosing a point.
+  /// - Map moving: pin lifts up and a small dot marks the exact spot below it.
+  /// - Map stopped: the dot disappears and the pin drops onto that spot.
+  Widget _buildCenterPin() {
+    final isDrop = _phase == _Phase.pickingDropoff;
+    final asset = isDrop ? _dropoffPinPath : _pickupPinPath;
+    final fallbackColor = isDrop ? _brandRed : Colors.green;
+
+    return IgnorePointer(
+      child: Center(
+        child: ValueListenableBuilder<bool>(
+          valueListenable: _moving,
+          builder: (context, moving, _) {
+            // Zero-height anchor sitting exactly on the map centre; children
+            // are positioned relative to it (negative top = above centre).
+            return SizedBox(
+              width: _pinW,
+              height: 0,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: _pinW / 2 - 5,
+                    top: -5,
+                    child: AnimatedOpacity(
+                      opacity: moving ? 1 : 0,
+                      duration: const Duration(milliseconds: 150),
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          // Red for pickup / location, orange for drop-off.
+                          color: isDrop ? _dropoffOrange : _brandRed,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black26, blurRadius: 3),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    left: 0,
+                    top: -_pinH - (moving ? _pinLift : 0),
+                    width: _pinW,
+                    height: _pinH,
+                    child: Image.asset(
+                      asset,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.bottomCenter,
+                      errorBuilder: (_, __, ___) => Icon(
+                        Icons.location_on,
+                        color: fallbackColor,
+                        size: _pinH * 0.8,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -705,38 +640,6 @@ class _RequestServicePageState extends State<RequestServicePage>
     );
   }
 
-  Widget _buildPickingBanner() {
-    final label = _isSingleLocation
-        ? 'location'
-        : (_activeField == _PickTarget.pickup ? 'pickup' : 'drop-off');
-    return SafeArea(
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 56, 16, 0),
-          child: Material(
-            color: Colors.white,
-            elevation: 3,
-            borderRadius: BorderRadius.circular(24),
-            child: Padding(
-              padding: const EdgeInsets.only(left: 16, right: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Tap the map to set $label'),
-                  TextButton(
-                    onPressed: () => setState(() => _pickingOnMap = false),
-                    child: const Text('Cancel'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _circleButton({
     required IconData icon,
     required VoidCallback onTap,
@@ -758,6 +661,156 @@ class _RequestServicePageState extends State<RequestServicePage>
     );
   }
 
+  BoxDecoration _sheetDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.12),
+          blurRadius: 15,
+          offset: const Offset(0, -3),
+        ),
+      ],
+    );
+  }
+
+  Widget _grabber() {
+    return Container(
+      width: 44,
+      height: 5,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade300,
+        borderRadius: BorderRadius.circular(3),
+      ),
+    );
+  }
+
+  // ---------------- Pick bar (choose a point with the centre pin) --------
+  Widget _buildPickBar() {
+    final isDrop = _phase == _Phase.pickingDropoff;
+    final String title;
+    final String hint;
+    final String confirmLabel;
+    if (_isSingleLocation) {
+      title = 'Set your location';
+      hint = 'Move the map to place the pin on your location';
+      confirmLabel = 'Confirm location';
+    } else if (isDrop) {
+      title = 'Set drop-off point';
+      hint = 'Move the map to place the pin on the drop-off point';
+      confirmLabel = 'Confirm drop-off point';
+    } else {
+      title = 'Set pickup point';
+      hint = 'Move the map to place the pin on the pickup point';
+      confirmLabel = 'Confirm pickup point';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        16,
+        10,
+        16,
+        16 + MediaQuery.of(context).padding.bottom,
+      ),
+      decoration: _sheetDecoration(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _grabber(),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hint,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 16),
+          ValueListenableBuilder<bool>(
+            valueListenable: _moving,
+            builder: (context, moving, _) {
+              final address = moving
+                  ? 'Locating…'
+                  : (_pendingAddress ?? 'Finding address…');
+              final enabled = !moving && _pendingPoint != null;
+              return Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.shade400),
+                    ),
+                    child: Row(
+                      children: [
+                        // Red dot for pickup / location, orange for drop-off.
+                        _LocationDot(
+                          color: isDrop ? _dropoffOrange : _brandRed,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            address,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: (moving || _pendingAddress == null)
+                                  ? Colors.grey.shade600
+                                  : Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: enabled ? _onConfirmPoint : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _brandRed,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: _brandRed.withValues(
+                          alpha: 0.4,
+                        ),
+                        disabledForegroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: Text(
+                        confirmLabel,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- Details sheet ----------------
   Widget _buildSheet() {
     return ConstrainedBox(
       // Keeps the map visible even on small screens / with the keyboard open.
@@ -772,29 +825,12 @@ class _RequestServicePageState extends State<RequestServicePage>
           16,
           16 + MediaQuery.of(context).padding.bottom,
         ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 15,
-              offset: const Offset(0, -3),
-            ),
-          ],
-        ),
+        decoration: _sheetDecoration(),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
+              _grabber(),
               const SizedBox(height: 14),
               Text(
                 _config.title,
@@ -812,46 +848,11 @@ class _RequestServicePageState extends State<RequestServicePage>
               const SizedBox(height: 20),
               _buildServiceDetails(),
               const SizedBox(height: 20),
-              _buildSearchRadiusSelector(),
-              const SizedBox(height: 20),
               _buildConfirmButton(),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildSearchRadiusSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Search Radius',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-            ),
-            Text(
-              '${_searchRadius.toInt()} km',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: _brandRed,
-              ),
-            ),
-          ],
-        ),
-        Slider(
-          value: _searchRadius,
-          min: 1,
-          max: 50,
-          divisions: 49,
-          activeColor: _brandRed,
-          onChanged: (val) => setState(() => _searchRadius = val),
-        ),
-      ],
     );
   }
 
@@ -878,7 +879,16 @@ class _RequestServicePageState extends State<RequestServicePage>
   Widget _buildTowingDetails() {
     return Column(
       children: [
-        Align(alignment: Alignment.centerLeft, child: _buildVehicleButton()),
+        // Vehicle on the left, distance + time on the same level on the right.
+        Row(
+          children: [
+            // Vehicle button takes all the free space; the distance/time
+            // text only takes what it needs.
+            Expanded(child: _buildVehicleButton()),
+            const SizedBox(width: 12),
+            _buildRouteSummary(),
+          ],
+        ),
         const SizedBox(height: 18),
         Container(
           padding: const EdgeInsets.all(14),
@@ -890,16 +900,11 @@ class _RequestServicePageState extends State<RequestServicePage>
             children: [
               Column(
                 children: [
+                  // Pickup: red dot (same as the map).
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _startRepick(_PickTarget.pickup),
-                    child: Image.asset(
-                      _config.iconPath,
-                      width: 24,
-                      height: 24,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.local_shipping_outlined, size: 24),
-                    ),
+                    child: const _LocationDot(color: _brandRed),
                   ),
                   ...List.generate(
                     4,
@@ -910,10 +915,11 @@ class _RequestServicePageState extends State<RequestServicePage>
                       color: Colors.black87,
                     ),
                   ),
+                  // Drop-off: orange dot (same as the map).
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _startRepick(_PickTarget.dropoff),
-                    child: const Icon(Icons.location_on_outlined, size: 24),
+                    child: const _LocationDot(color: _dropoffOrange),
                   ),
                 ],
               ),
@@ -938,35 +944,6 @@ class _RequestServicePageState extends State<RequestServicePage>
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            OutlinedButton.icon(
-              onPressed: _onSetLocationOnMap,
-              icon: const Icon(
-                Icons.map_outlined,
-                size: 20,
-                color: Colors.black87,
-              ),
-              label: const Text(
-                'Set Location on map',
-                style: TextStyle(color: Colors.black87, fontSize: 12),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                side: BorderSide(color: Colors.grey.shade400),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: _buildRouteSummary()),
-          ],
-        ),
       ],
     );
   }
@@ -981,7 +958,7 @@ class _RequestServicePageState extends State<RequestServicePage>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (showVehicle) ...[
-          Align(alignment: Alignment.centerLeft, child: _buildVehicleButton()),
+          SizedBox(width: double.infinity, child: _buildVehicleButton()),
           const SizedBox(height: 18),
         ],
         if (header != null) header,
@@ -1001,7 +978,7 @@ class _RequestServicePageState extends State<RequestServicePage>
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _startRepick(_PickTarget.pickup),
-                child: const Icon(Icons.location_on_outlined, size: 24),
+                child: const _LocationDot(color: _brandRed),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1012,22 +989,6 @@ class _RequestServicePageState extends State<RequestServicePage>
                 ),
               ),
             ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        OutlinedButton.icon(
-          onPressed: _onSetLocationOnMap,
-          icon: const Icon(Icons.map_outlined, size: 20, color: Colors.black87),
-          label: const Text(
-            'Set Location on map',
-            style: TextStyle(color: Colors.black87, fontSize: 12),
-          ),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            side: BorderSide(color: Colors.grey.shade400),
           ),
         ),
       ],
@@ -1120,6 +1081,7 @@ class _RequestServicePageState extends State<RequestServicePage>
     );
   }
 
+  /// Read-only: tapping the field opens the map picker for that point.
   Widget _locationField(
     TextEditingController controller,
     String hint,
@@ -1127,10 +1089,11 @@ class _RequestServicePageState extends State<RequestServicePage>
   ) {
     return TextField(
       controller: controller,
+      readOnly: true,
+      showCursor: false,
+      enableInteractiveSelection: false,
       style: const TextStyle(fontSize: 14),
-      textInputAction: TextInputAction.search,
-      onTap: () => setState(() => _activeField = target),
-      onSubmitted: (text) => _onFieldSubmitted(target, text),
+      onTap: () => _startRepick(target),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(fontSize: 14, color: Colors.grey.shade600),
@@ -1323,6 +1286,9 @@ class _RequestServicePageState extends State<RequestServicePage>
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  String _coordsText(LatLng p) =>
+      '${p.latitude.toStringAsFixed(5)}, ${p.longitude.toStringAsFixed(5)}';
+
   Future<void> _showLocationAlert({
     required String title,
     required String message,
@@ -1403,7 +1369,7 @@ class _RequestServicePageState extends State<RequestServicePage>
   Future<void> _goToMyLocation() async {
     final here = _userLocation ?? await _getCurrentLatLng();
     if (here == null || !mounted) return;
-    _mapController.move(here, 16);
+    _mapController.move(here, 17);
   }
 
   /// Runs once the map is ready: gets a first fix, then streams live updates.
@@ -1468,21 +1434,125 @@ class _RequestServicePageState extends State<RequestServicePage>
       _userLocation = here;
       _userAccuracy = pos.accuracy;
       _locatingUser = false;
+      // GPS heading is only meaningful while moving; otherwise keep the
+      // last known direction.
+      if (pos.heading.isFinite && pos.heading >= 0 && pos.speed > 0.5) {
+        _heading = pos.heading;
+      }
     });
 
     if (isFirstFix) {
       _hasCenteredOnUser = true;
-      _mapController.move(here, 16);
-      // Prefill pickup once with the first fix (tow truck only).
-      if (_isTow || _isSingleLocation) {
-        _setPoint(_PickTarget.pickup, here).then((_) {
-          // Only towing has a drop-off to move on to.
-          if (mounted && _isTow) {
-            setState(() => _activeField = _PickTarget.dropoff);
-          }
-        });
+      // Pickup is NOT filled automatically any more: just bring the map to
+      // the user so they can place the pin where they want.
+      if (_phase == _Phase.pickingPickup &&
+          _pickup == null &&
+          !_userTouchedMap) {
+        _mapController.move(here, 17);
       }
     }
+  }
+
+  // ---------------- Centre-pin picking ----------------
+  /// Called on every camera change. While the user drags, the pin is lifted;
+  /// once the map has been still for a moment it "settles".
+  void _onMapPositionChanged(bool hasGesture) {
+    if (!_isPicking) return;
+    if (hasGesture) {
+      _userTouchedMap = true;
+      if (!_moving.value) _moving.value = true;
+    }
+    _settleTimer?.cancel();
+    _settleTimer = Timer(const Duration(milliseconds: 350), _onMapSettled);
+  }
+
+  void _onMapSettled() {
+    if (!mounted || !_isPicking || !_mapReady) return;
+    _moving.value = false;
+    final c = _mapController.camera.center;
+    final p = _pendingPoint;
+    // Already resolved for this exact spot (avoids a duplicate lookup).
+    if (p != null &&
+        (p.latitude - c.latitude).abs() < 1e-7 &&
+        (p.longitude - c.longitude).abs() < 1e-7) {
+      return;
+    }
+    _updatePendingFromCenter();
+  }
+
+  /// Reads the point under the centre pin and looks up its address.
+  Future<void> _updatePendingFromCenter() async {
+    if (!mounted || !_mapReady || !_isPicking) return;
+    final center = _mapController.camera.center;
+    final token = ++_pendingToken;
+    setState(() {
+      _pendingPoint = center;
+      _pendingAddress = null;
+    });
+    final address = await MapApi.reverseGeocode(center);
+    if (!mounted || token != _pendingToken) return; // user moved again
+    setState(() => _pendingAddress = address ?? _coordsText(center));
+  }
+
+  /// Moves to a phase of the flow. [moveTo] recentres the map first.
+  void _goToPhase(_Phase phase, {LatLng? moveTo}) {
+    FocusScope.of(context).unfocus();
+    _settleTimer?.cancel();
+    _moving.value = false;
+    _pendingToken++;
+    setState(() {
+      _phase = phase;
+      if (phase == _Phase.pickingPickup) _activeField = _PickTarget.pickup;
+      if (phase == _Phase.pickingDropoff) _activeField = _PickTarget.dropoff;
+      _pendingPoint = null;
+      _pendingAddress = null;
+    });
+    if (moveTo != null && _mapReady) _mapController.move(moveTo, 17);
+    if (phase != _Phase.details) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _updatePendingFromCenter(),
+      );
+    }
+  }
+
+  /// "Confirm pickup / drop-off point" button.
+  Future<void> _onConfirmPoint() async {
+    final point = _pendingPoint;
+    if (point == null) return;
+
+    final target = _phase == _Phase.pickingDropoff
+        ? _PickTarget.dropoff
+        : _PickTarget.pickup;
+    final address = _pendingAddress; // null -> _setPoint looks it up
+
+    // Towing: after the pickup, go on to choose the drop-off the same way.
+    final next = (_isTow && target == _PickTarget.pickup && _dropoff == null)
+        ? _Phase.pickingDropoff
+        : _Phase.details;
+    if (next == _Phase.details) _reachedDetails = true;
+
+    _goToPhase(next);
+    await _setPoint(target, point, label: address);
+  }
+
+  /// Back arrow: steps back through the flow, or leaves the page.
+  void _onBack() {
+    if (_phase == _Phase.details) {
+      Navigator.of(context).pop();
+      return;
+    }
+    if (_reachedDetails) {
+      // Cancel a re-pick and return to the details sheet.
+      _settleTimer?.cancel();
+      _moving.value = false;
+      setState(() => _phase = _Phase.details);
+      return;
+    }
+    if (_phase == _Phase.pickingDropoff) {
+      _goToPhase(_Phase.pickingPickup, moveTo: _pickup);
+      return;
+    }
+    Navigator.of(context).pop();
   }
 
   /// Stores a point, updates its text field, then refreshes the route.
@@ -1496,6 +1566,7 @@ class _RequestServicePageState extends State<RequestServicePage>
         ? _pickupController
         : _dropoffController;
 
+    controller.text = label ?? _coordsText(point);
     setState(() {
       if (target == _PickTarget.pickup) {
         _pickup = point;
@@ -1504,14 +1575,13 @@ class _RequestServicePageState extends State<RequestServicePage>
       }
     });
 
-    if (label != null) {
-      controller.text = label;
-    } else {
-      controller.text =
-          '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+    if (label == null) {
       final address = await MapApi.reverseGeocode(point);
       if (!mounted) return;
-      if (address != null) controller.text = address;
+      if (address != null) {
+        controller.text = address;
+        setState(() {});
+      }
     }
 
     await _updateRoute();
@@ -1544,6 +1614,9 @@ class _RequestServicePageState extends State<RequestServicePage>
       _durationMin = (result.durationSeconds / 60).round();
     });
 
+    // Don't fight the user while they are choosing a point.
+    if (_isPicking) return;
+
     // The map now sits above the sheet, so only small paddings are needed.
     _mapController.fitCamera(
       CameraFit.coordinates(
@@ -1554,50 +1627,16 @@ class _RequestServicePageState extends State<RequestServicePage>
   }
 
   // ---------------- Actions ----------------
-  Future<void> _onFieldSubmitted(_PickTarget target, String text) async {
-    final query = text.trim();
-    if (query.isEmpty) return;
-    FocusScope.of(context).unfocus();
-
-    final point = await MapApi.geocode(query);
-    if (!mounted) return;
-    if (point == null) {
-      _snack('Location not found. Try a more specific address.');
-      return;
-    }
-
-    await _setPoint(target, point, label: query);
-    if (_routePoints.isEmpty && mounted) {
-      _mapController.move(point, 15);
-    }
-  }
-
-  /// Called when a pin (map or sheet icon) is tapped: switch to that target
-  /// and let the user tap the map to choose a new spot for it.
+  /// Called when a pin (map or sheet icon) is tapped: go back to choosing
+  /// that point with the centre pin, starting from where it is now.
   void _startRepick(_PickTarget target) {
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _activeField = target;
-      _pickingOnMap = true;
-    });
-  }
-
-  void _onSetLocationOnMap() {
-    FocusScope.of(context).unfocus();
-    setState(() => _pickingOnMap = true);
-  }
-
-  Future<void> _onMapTap(LatLng point) async {
-    if (!_pickingOnMap) return;
-    final target = _activeField;
-    setState(() => _pickingOnMap = false);
-
-    await _setPoint(target, point);
-
-    // After setting pickup, move on to drop-off automatically.
-    if (mounted && _isTow && target == _PickTarget.pickup && _dropoff == null) {
-      setState(() => _activeField = _PickTarget.dropoff);
-    }
+    final existing = target == _PickTarget.pickup ? _pickup : _dropoff;
+    _goToPhase(
+      target == _PickTarget.pickup
+          ? _Phase.pickingPickup
+          : _Phase.pickingDropoff,
+      moveTo: existing,
+    );
   }
 
   /// Loads the logged-in user's active vehicle (if any) on page load.
@@ -1725,6 +1764,8 @@ class _RequestServicePageState extends State<RequestServicePage>
         return;
       }
     }
+    // The request starts at the default radius (5 km); the searching page
+    // widens it to 10 km and 15 km automatically.
     if (_isTow) {
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -1738,7 +1779,7 @@ class _RequestServicePageState extends State<RequestServicePage>
             distanceKm: _distanceKm,
             durationMin: _durationMin,
             vehicle: _vehicle,
-            searchRadiusKm: _searchRadius,
+            searchRadiusKm: _initialSearchRadiusKm,
           ),
         ),
       );
@@ -1756,11 +1797,223 @@ class _RequestServicePageState extends State<RequestServicePage>
             fuelType: _isFuel
                 ? (_fuelType == _FuelType.petrol ? 'Petrol' : 'Diesel')
                 : null,
-            searchRadiusKm: _searchRadius,
+            searchRadiusKm: _initialSearchRadiusKm,
           ),
         ),
       );
       return;
     }
+  }
+}
+
+/// Blue live-location dot. When [heading] is known, a translucent cone
+/// points the way the user is facing (like Google Maps).
+class _HeadingDot extends StatelessWidget {
+  final double? heading;
+
+  const _HeadingDot({this.heading});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        if (heading != null)
+          Transform.rotate(
+            angle: heading! * math.pi / 180,
+            child: CustomPaint(
+              size: const Size(64, 64),
+              painter: _ConePainter(),
+            ),
+          ),
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: Colors.blue,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ConePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2;
+    const spread = math.pi / 3; // total cone angle (60 degrees)
+    final rect = Rect.fromCircle(center: c, radius: r);
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.blue.withValues(alpha: 0.55),
+          Colors.blue.withValues(alpha: 0.0),
+        ],
+      ).createShader(rect);
+    // Up (north) is -pi/2 in canvas angles.
+    canvas.drawArc(rect, -math.pi / 2 - spread / 2, spread, true, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Ring-style dot (same look as the confirmed-point dots on the map),
+/// used as the location icon in the details sheet.
+class _LocationDot extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _LocationDot({required this.color, this.size = 24});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      ),
+      child: Center(
+        child: Container(
+          width: size * 0.375,
+          height: size * 0.375,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Label pill above a ring-style dot (solid colour with a white centre).
+/// The marker is centred on the map point and the dot is centred inside the
+/// marker, so the dot's middle sits exactly on the location.
+class _LabeledDot extends StatelessWidget {
+  final Widget pill;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _LabeledDot({required this.pill, required this.color, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    // Marker height is 120, so the centre is 60 from the bottom. The dot is
+    // 24 high (top at 72); the pill's bottom sits 6 above that (78).
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          bottom: 78,
+          left: 0,
+          right: 0,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [pill]),
+        ),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 4),
+              ],
+            ),
+            child: Center(
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// White pill with a coloured tag, e.g. [Pickup] 123 Main Rd.
+class _AddressPill extends StatelessWidget {
+  final String tag;
+  final Color color;
+  final String text;
+
+  const _AddressPill({
+    required this.tag,
+    required this.color,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 240),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(5, 5, 14, 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                tag,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

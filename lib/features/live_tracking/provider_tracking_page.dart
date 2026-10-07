@@ -16,8 +16,8 @@ import '../../entities/service_request.dart';
 import '../../services/tracking_registry.dart';
 
 const Color _brandRed = Color(0xFFE30613);
+const Color _dropoffOrange = Color(0xFFFF8C00);
 const Color _success = Color(0xFF22C55E);
-const Color _pickupBlue = Color(0xFF1E88E5);
 const String _appPackageName = 'com.example.roadside_assitance';
 const String _userAgent = 'RoadsideAssistance/1.0 (kavidupurnamal@gmail.com)';
 
@@ -631,7 +631,7 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
           ),
         MarkerLayer(
           markers: [
-            // Pickup point + label, until the car is being towed to the
+            // Pickup point + label (red), until the car is being towed to the
             // drop-off.
             if (!_toDropoff)
               Marker(
@@ -641,15 +641,15 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                 child: _LabeledDot(
                   pill: _AddressPill(
                     tag: 'Pickup',
-                    color: _pickupBlue,
+                    color: _brandRed,
                     text: _r!.pickupAddress.isEmpty
                         ? 'Pickup point'
                         : _r!.pickupAddress,
                   ),
-                  color: Colors.black,
+                  color: _brandRed,
                 ),
               ),
-            // Drop-off point + label (towing).
+            // Drop-off point + label (orange, towing).
             if (dropoff != null && !_finished)
               Marker(
                 point: dropoff,
@@ -658,12 +658,12 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                 child: _LabeledDot(
                   pill: _AddressPill(
                     tag: 'Drop',
-                    color: _brandRed,
+                    color: _dropoffOrange,
                     text: (_r!.dropoffAddress ?? '').isEmpty
                         ? 'Drop-off point'
                         : _r!.dropoffAddress!,
                   ),
-                  color: _brandRed,
+                  color: _dropoffOrange,
                 ),
               ),
             // This provider: blue live dot with a direction cone.
