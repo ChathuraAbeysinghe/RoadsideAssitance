@@ -76,23 +76,31 @@ class AppBottomNavBar extends StatelessWidget {
           : const ProviderHomePage(userType: UserType.assistanceProvider),
     ),
     _NavTab(
-      label: userType == UserType.driver ? 'Requests' : 'Job',
-      inactiveIconAssetPath: 'assets/images/clipboard1.png',
-      activeIconAssetPath: 'assets/images/clipboard2.png',
+      label: userType == UserType.driver ? 'Requests' : 'History',
+      inactiveIconAssetPath: userType == UserType.driver
+          ? 'assets/images/clipboard1.png'
+          : 'assets/icon/nav-bar-service-history1.png',
+      activeIconAssetPath: userType == UserType.driver
+          ? 'assets/images/clipboard2.png'
+          : 'assets/icon/nav-bar-service-history2.png',
       destinationBuilder: (_) => userType == UserType.driver
           ? RequestsPage(userType: userType)
           : const ProviderJobsPage(),
     ),
     _NavTab(
       label: userType == UserType.driver ? 'Vehicle' : 'Services',
-      inactiveIconAssetPath: 'assets/images/wheel1.png',
-      activeIconAssetPath: 'assets/images/wheel2.png',
+      inactiveIconAssetPath: userType == UserType.driver
+        ? 'assets/images/wheel1.png'
+        : 'assets/icon/nav-bar-services1.png',
+      activeIconAssetPath: userType == UserType.driver
+        ? 'assets/images/wheel2.png'
+        : 'assets/icon/nav-bar-services2.png',
       destinationBuilder: (_) => userType == UserType.driver
-          ? VehicleListPage(uid: _uid)
-          : ProviderServicesPage(
-              uid: _uid,
-              userType: UserType.assistanceProvider,
-            ),
+        ? VehicleListPage(uid: _uid)
+        : ProviderServicesPage(
+          uid: _uid,
+          userType: UserType.assistanceProvider,
+        ),
     ),
     _NavTab(
       label: 'More',
