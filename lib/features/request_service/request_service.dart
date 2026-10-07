@@ -248,6 +248,8 @@ class _RequestServicePageState extends State<RequestServicePage>
   final _litersController = TextEditingController(text: '5');
   final _litersFocus = FocusNode();
 
+  double _searchRadius = 5.0;
+
   // Vehicle for this request (user's active vehicle by default)
   Vehicle? _vehicle;
   bool _loadingVehicle = true;
@@ -673,7 +675,7 @@ class _RequestServicePageState extends State<RequestServicePage>
         // Live nearby assistance. Last child so the info card draws on top.
         // Hidden while picking so it can't swallow taps meant for choosing
         // a location.
-        if (!_pickingOnMap) _buildProviderMarkers(kSearchRadiiKm.last * 1000),
+        if (!_pickingOnMap) _buildProviderMarkers(_searchRadius * 1000),
       ],
     );
   }
@@ -810,11 +812,46 @@ class _RequestServicePageState extends State<RequestServicePage>
               const SizedBox(height: 20),
               _buildServiceDetails(),
               const SizedBox(height: 20),
+              _buildSearchRadiusSelector(),
+              const SizedBox(height: 20),
               _buildConfirmButton(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSearchRadiusSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Search Radius',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+            Text(
+              '${_searchRadius.toInt()} km',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: _brandRed,
+              ),
+            ),
+          ],
+        ),
+        Slider(
+          value: _searchRadius,
+          min: 1,
+          max: 50,
+          divisions: 49,
+          activeColor: _brandRed,
+          onChanged: (val) => setState(() => _searchRadius = val),
+        ),
+      ],
     );
   }
 
@@ -1701,6 +1738,7 @@ class _RequestServicePageState extends State<RequestServicePage>
             distanceKm: _distanceKm,
             durationMin: _durationMin,
             vehicle: _vehicle,
+            searchRadiusKm: _searchRadius,
           ),
         ),
       );
@@ -1718,6 +1756,7 @@ class _RequestServicePageState extends State<RequestServicePage>
             fuelType: _isFuel
                 ? (_fuelType == _FuelType.petrol ? 'Petrol' : 'Diesel')
                 : null,
+            searchRadiusKm: _searchRadius,
           ),
         ),
       );

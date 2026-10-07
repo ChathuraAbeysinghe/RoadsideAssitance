@@ -78,7 +78,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
 
   RequestStatus get _status => _request?.status ?? RequestStatus.pending;
 
-  int get _stageSeconds => kSearchTimeout.inSeconds ~/ kSearchRadiiKm.length;
+  int get _stageSeconds => kSearchTimeout.inSeconds ~/ 3;
 
   @override
   void initState() {
@@ -169,14 +169,10 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
 
       final newStage = (_elapsedSeconds ~/ _stageSeconds).clamp(
         0,
-        kSearchRadiiKm.length - 1,
+        2,
       );
       if (newStage != _stage) {
         setState(() => _stage = newStage);
-        _fitMapToRadius();
-        try {
-          await updateSearchRadius(widget.requestId, kSearchRadiiKm[newStage]);
-        } catch (_) {}
       }
     });
   }
@@ -198,9 +194,10 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
   }
 
   void _fitMapToRadius() {
+    final r = _request?.searchRadiusKm ?? 5.0;
     _mapController.fitCamera(
       CameraFit.coordinates(
-        coordinates: _radiusExtent(kSearchRadiiKm[_stage]),
+        coordinates: _radiusExtent(r),
         padding: _mapFitPadding,
       ),
     );
@@ -536,7 +533,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
   }
 
   Widget _buildMap() {
-    final radiusKm = kSearchRadiiKm[_stage];
+    final radiusKm = _request?.searchRadiusKm ?? 5.0;
     final searching = _status == RequestStatus.pending;
     return FlutterMap(
       mapController: _mapController,
@@ -544,7 +541,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
         initialCenter: widget.pickup,
         initialZoom: 13,
         initialCameraFit: CameraFit.coordinates(
-          coordinates: _radiusExtent(kSearchRadiiKm.first),
+          coordinates: _radiusExtent(radiusKm),
           padding: _mapFitPadding,
         ),
         // Pinch to zoom and drag are allowed; rotation stays off.
@@ -667,7 +664,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
         ),
         const SizedBox(height: 6),
         Text(
-          'Searching within ${kSearchRadiiKm[_stage].toStringAsFixed(0)} km…',
+          'Searching within ${(_request?.searchRadiusKm ?? 5.0).toStringAsFixed(0)} km…',
           style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 20),
@@ -768,7 +765,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
       builder: (context, elapsed, _) {
         return Row(
           children: [
-            for (var i = 0; i < kSearchRadiiKm.length; i++) ...[
+            for (var i = 0; i < 3; i++) ...[
               if (i > 0) const SizedBox(width: 8),
               Expanded(child: _stageBar(i, elapsed)),
             ],

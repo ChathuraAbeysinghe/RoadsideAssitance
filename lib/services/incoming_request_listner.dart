@@ -277,7 +277,30 @@ class IncomingRequestListener {
   }
 
   Future<bool> _isNearby(ServiceRequest r) async {
-    final me = await _myPosition();
+    LatLng? me;
+    if (_uid != null) {
+      try {
+        final psSnap = await FirebaseFirestore.instance
+            .collection('providerServices')
+            .where('providerUid', isEqualTo: _uid)
+            .where('serviceType', isEqualTo: r.serviceType.name)
+            .where('isActive', isEqualTo: true)
+            .get();
+        if (psSnap.docs.isNotEmpty) {
+          final locMap = psSnap.docs.first.data()['locationGeo'] as Map<String, dynamic>?;
+          if (locMap != null) {
+            final lat = locMap['latitude'];
+            final lng = locMap['longitude'];
+            if (lat != null && lng != null && (lat != 0 || lng != 0)) {
+              me = LatLng((lat as num).toDouble(), (lng as num).toDouble());
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    
+    me ??= await _myPosition();
+    
     if (me == null) {
       _log('no position for this provider yet, skipping ${r.id}');
       return false;
@@ -315,25 +338,10 @@ class IncomingRequestListener {
     return null;
   }
 
-  /// Opens the incoming request page and waits until the provider closes it.
-  /// If they accepted, opens the provider tracking page and waits for that
-  /// too, so no new request pops up over a job they just started.
   Future<bool> _show(ServiceRequest r) async {
-    final nav = _navKey?.currentState;
-    final builder = _incomingBuilder;
-    if (nav == null || builder == null) return false;
-    _log('showing request ${r.id}');
-
-    final accepted = await nav.push<bool>(
-      MaterialPageRoute(fullscreenDialog: true, builder: (_) => builder(r)),
-    );
-
-    if (accepted == true && nav.mounted) {
-      _log('accepted ${r.id}, opening provider tracking page');
-      _providerOpened.add(r.id);
-      await _pushPage(_providerTrackingBuilder, r);
-    }
-    return true;
+    // Automatically showing full-screen or popup is disabled as per user request.
+    // The provider will see new requests only in the ProviderHomePage.
+    return false;
   }
 
   // ---------------- provider: own jobs ----------------
