@@ -232,7 +232,9 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
   void dispose() {
     TrackingRegistry.remove(widget.requestId);
     _posSub?.cancel();
-    _sharer.stop();
+    // Location sharing is NOT stopped here: it must keep running in the
+    // background while the request is active. The sharer stops itself when
+    // the request ends.
     _reqSub?.cancel();
     _provSub?.cancel();
     _recenterTimer?.cancel();
