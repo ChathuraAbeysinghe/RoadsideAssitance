@@ -163,10 +163,8 @@ class IncomingRequestListener {
       _providerSig = sig;
 
       if (appUser.isAvailable && appUser.services.isNotEmpty) {
-        // Feature disabled: We no longer auto-open the request page.
-        // The provider will see requests in the home page list and tap "View Details" to open them.
-        // _startPending(uid, appUser.services);
-        _uid = uid; // We still set _uid so that other checks know who the provider is.
+        // Start watching pending requests; _startPending sets _uid.
+        _startPending(uid, appUser.services);
       } else {
         _log('provider not available, not listening for new requests');
         _stopPending();
