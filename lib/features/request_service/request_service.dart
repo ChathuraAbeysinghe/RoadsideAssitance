@@ -31,7 +31,7 @@ class _ServiceConfig {
 
 const String _placeholderIcon = 'assets/images/pickup-point.png';
 const String _pickupPinPath = 'assets/images/pickup-point.png';
-const String _dropoffPinPath = 'assets/images/dropoff.png';
+const String _dropoffPinPath = 'assets/images/dropoff-point.png';
 
 const Color _dropoffOrange = Color(0xFFFF8C00);
 
@@ -752,15 +752,9 @@ class _RequestServicePageState extends State<RequestServicePage>
                     ),
                     child: Row(
                       children: [
-                        Image.asset(
-                          isDrop ? _dropoffPinPath : _pickupPinPath,
-                          width: 24,
-                          height: 24,
-                          errorBuilder: (_, __, ___) => Icon(
-                            Icons.location_on_outlined,
-                            size: 24,
-                            color: isDrop ? _brandRed : Colors.green,
-                          ),
+                        // Red dot for pickup / location, orange for drop-off.
+                        _LocationDot(
+                          color: isDrop ? _dropoffOrange : _brandRed,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -888,9 +882,11 @@ class _RequestServicePageState extends State<RequestServicePage>
         // Vehicle on the left, distance + time on the same level on the right.
         Row(
           children: [
-            Flexible(child: _buildVehicleButton()),
+            // Vehicle button takes all the free space; the distance/time
+            // text only takes what it needs.
+            Expanded(child: _buildVehicleButton()),
             const SizedBox(width: 12),
-            Expanded(child: _buildRouteSummary()),
+            _buildRouteSummary(),
           ],
         ),
         const SizedBox(height: 18),
@@ -904,16 +900,11 @@ class _RequestServicePageState extends State<RequestServicePage>
             children: [
               Column(
                 children: [
+                  // Pickup: red dot (same as the map).
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _startRepick(_PickTarget.pickup),
-                    child: Image.asset(
-                      _config.iconPath,
-                      width: 24,
-                      height: 24,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.local_shipping_outlined, size: 24),
-                    ),
+                    child: const _LocationDot(color: _brandRed),
                   ),
                   ...List.generate(
                     4,
@@ -924,16 +915,11 @@ class _RequestServicePageState extends State<RequestServicePage>
                       color: Colors.black87,
                     ),
                   ),
+                  // Drop-off: orange dot (same as the map).
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _startRepick(_PickTarget.dropoff),
-                    child: Image.asset(
-                      _dropoffPinPath,
-                      width: 24,
-                      height: 24,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.location_on_outlined, size: 24),
-                    ),
+                    child: const _LocationDot(color: _dropoffOrange),
                   ),
                 ],
               ),
@@ -972,7 +958,7 @@ class _RequestServicePageState extends State<RequestServicePage>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (showVehicle) ...[
-          Align(alignment: Alignment.centerLeft, child: _buildVehicleButton()),
+          SizedBox(width: double.infinity, child: _buildVehicleButton()),
           const SizedBox(height: 18),
         ],
         if (header != null) header,
@@ -992,7 +978,7 @@ class _RequestServicePageState extends State<RequestServicePage>
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _startRepick(_PickTarget.pickup),
-                child: const Icon(Icons.location_on_outlined, size: 24),
+                child: const _LocationDot(color: _brandRed),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1875,6 +1861,39 @@ class _ConePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Ring-style dot (same look as the confirmed-point dots on the map),
+/// used as the location icon in the details sheet.
+class _LocationDot extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _LocationDot({required this.color, this.size = 24});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      ),
+      child: Center(
+        child: Container(
+          width: size * 0.375,
+          height: size * 0.375,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Label pill above a ring-style dot (solid colour with a white centre).
