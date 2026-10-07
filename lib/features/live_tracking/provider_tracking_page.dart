@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -14,9 +17,17 @@ import '../../services/tracking_registry.dart';
 
 const Color _brandRed = Color(0xFFE30613);
 const Color _success = Color(0xFF22C55E);
-const String _assistanceIcon = 'assets/images/assistance1.png';
 const String _pickupPinPath = 'assets/images/pickup-point.png';
+
+/// Arrow showing this provider's position and direction of travel.
+const String _arrowIcon = 'assets/images/arrow.png';
+
+/// Which way the arrow image itself points, in degrees clockwise from "up":
+/// 0 = tip points to the top of the image, 90 = right, 180 = down, 270 = left.
+/// Change this if the arrow turns the wrong way.
+const double _arrowFacing = 0;
 const String _appPackageName = 'com.example.roadside_assitance';
+const String _userAgent = 'RoadsideAssistance/1.0 (kavidupurnamal@gmail.com)';
 
 /// Contact button icons (same files as the driver tracking page).
 const String _messageIcon = 'assets/images/message.png';
@@ -25,6 +36,47 @@ const String _callIcon = 'assets/images/call.png';
 /// The map is laid out 30px taller than what's visible (it extends under the
 /// sheet), hence the larger bottom padding.
 const EdgeInsets _fitPadding = EdgeInsets.fromLTRB(50, 90, 50, 70);
+
+class _RouteResult {
+  final List<LatLng> points;
+  final double distanceMeters;
+  final double durationSeconds;
+
+  const _RouteResult({
+    required this.points,
+    required this.distanceMeters,
+    required this.durationSeconds,
+  });
+}
+
+/// OSRM public demo server (testing only, same as the driver tracking page).
+Future<_RouteResult?> _fetchRoute(LatLng a, LatLng b) async {
+  try {
+    final uri = Uri.parse(
+      'https://router.project-osrm.org/route/v1/driving/'
+      '${a.longitude},${a.latitude};${b.longitude},${b.latitude}'
+      '?overview=full&geometries=geojson',
+    );
+    final res = await http.get(uri, headers: {'User-Agent': _userAgent});
+    if (res.statusCode != 200) return null;
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final routes = data['routes'] as List?;
+    if (routes == null || routes.isEmpty) return null;
+    final first = routes[0] as Map<String, dynamic>;
+    final coords = first['geometry']['coordinates'] as List;
+    return _RouteResult(
+      points: coords
+          .map(
+            (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+          )
+          .toList(),
+      distanceMeters: (first['distance'] as num).toDouble(),
+      durationSeconds: (first['duration'] as num).toDouble(),
+    );
+  } catch (_) {
+    return null;
+  }
+}
 
 /// ASSISTANCE PROVIDER-side tracking page for an accepted job.
 ///
@@ -57,6 +109,18 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
   AppUser? _driver; // the customer who made the request
   LatLng? _me; // this provider's position
 
+  // Direction this provider is heading (degrees clockwise from north);
+  // last known while moving. [_headingTurns] is the unwrapped (continuous)
+  // version used for animation so the arrow always turns the short way round.
+  double _heading = 0;
+  double _headingTurns = 0;
+
+  // Road route provider -> pickup (or drop-off once towing).
+  List<LatLng> _routePoints = [];
+  bool _routing = false;
+  LatLng? _routeOrigin;
+  DateTime _lastRouteAt = DateTime.fromMillisecondsSinceEpoch(0);
+
   bool _mapReady = false;
   bool _busy = false;
   bool _driverRequested = false;
@@ -68,13 +132,6 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
   LatLng? get _dropoff => _r?.dropoff == null
       ? null
       : LatLng(_r!.dropoff!.latitude, _r!.dropoff!.longitude);
-
-  /// The driver's live position, when their app is sharing it.
-  LatLng? get _driverLive {
-    final loc = _r?.customerLocation;
-    if (loc == null || (loc.latitude == 0 && loc.longitude == 0)) return null;
-    return LatLng(loc.latitude, loc.longitude);
-  }
 
   RequestStatus get _status => _r?.status ?? RequestStatus.accepted;
 
@@ -90,6 +147,16 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
     if (d != null && _status == RequestStatus.inProgress) return d;
     return _pickup;
   }
+
+  /// Towing job under way: the route now leads to the drop-off.
+  bool get _toDropoff =>
+      _status == RequestStatus.inProgress && _dropoff != null;
+
+  /// The route is only shown while heading to the pickup or the drop-off.
+  bool get _routeRelevant =>
+      _status == RequestStatus.accepted ||
+      _status == RequestStatus.onTheWay ||
+      _toDropoff;
 
   @override
   void initState() {
@@ -112,11 +179,23 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
   // ---------------- data ----------------
   void _onRequest(ServiceRequest? r) {
     if (!mounted || r == null) return;
+    final prevStatus = _r?.status;
     setState(() => _r = r);
 
     if (!_driverRequested) {
       _driverRequested = true;
       _loadDriver(r.customerUid);
+    }
+
+    // The route's destination depends on the status (pickup -> drop-off),
+    // so drop the old route and fetch the right one.
+    if (prevStatus != r.status) {
+      setState(() {
+        _routePoints = [];
+        _routeOrigin = null;
+      });
+      final me = _me;
+      if (me != null && _routeRelevant) _refreshRoute(me);
     }
   }
 
@@ -145,14 +224,84 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
           Geolocator.getPositionStream(
             locationSettings: const LocationSettings(
               accuracy: LocationAccuracy.high,
-              distanceFilter: 10,
+              distanceFilter: 5,
             ),
           ).listen((p) {
             if (!mounted) return;
-            setState(() => _me = LatLng(p.latitude, p.longitude));
+            final here = LatLng(p.latitude, p.longitude);
+            setState(() {
+              final prev = _me;
+              if (p.heading.isFinite && p.heading >= 0 && p.speed > 0.5) {
+                // GPS heading is only meaningful while moving.
+                _setHeading(p.heading);
+              } else if (prev != null &&
+                  const Distance().as(LengthUnit.Meter, prev, here) >= 3) {
+                // Otherwise use the direction between the last two fixes.
+                _setHeading(_bearing(prev, here));
+              }
+              _me = here;
+            });
+            if (_routeRelevant) _maybeRefreshRoute(here);
             _maybeFit();
           }, onError: (_) {});
     } catch (_) {}
+  }
+
+  /// Initial compass bearing from [a] to [b], 0-360 degrees.
+  static double _bearing(LatLng a, LatLng b) {
+    final lat1 = a.latitudeInRad;
+    final lat2 = b.latitudeInRad;
+    final dLng = b.longitudeInRad - a.longitudeInRad;
+    final y = math.sin(dLng) * math.cos(lat2);
+    final x =
+        math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(dLng);
+    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+  }
+
+  /// Stores the new heading and keeps [_headingTurns] continuous by moving
+  /// along the shortest arc from the previous heading.
+  void _setHeading(double heading) {
+    var delta = (heading - _heading) % 360;
+    if (delta > 180) delta -= 360;
+    _heading = heading;
+    _headingTurns += delta / 360;
+  }
+
+  // ---------------- route ----------------
+  /// Re-fetches the road route when the provider has moved enough, but not
+  /// more often than every 8 seconds (the OSRM demo server is rate limited).
+  void _maybeRefreshRoute(LatLng from) {
+    if (_routing) return;
+    final origin = _routeOrigin;
+    final moved = origin == null
+        ? double.infinity
+        : const Distance().as(LengthUnit.Meter, origin, from);
+    final recent =
+        DateTime.now().difference(_lastRouteAt) < const Duration(seconds: 8);
+    if (origin != null && (moved < 40 || recent)) return;
+    _refreshRoute(from);
+  }
+
+  Future<void> _refreshRoute(LatLng from) async {
+    _routing = true;
+    _lastRouteAt = DateTime.now();
+    final target = _target;
+    final result = await _fetchRoute(from, target);
+    _routing = false;
+    if (!mounted || result == null || !_routeRelevant || target != _target) {
+      return;
+    }
+
+    setState(() {
+      _routeOrigin = from;
+      _routePoints = result.points;
+    });
+
+    if (_mapReady &&
+        DateTime.now().difference(_lastGesture) > const Duration(seconds: 5)) {
+      _fitAll();
+    }
   }
 
   // ---------------- map ----------------
@@ -166,19 +315,14 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
 
   void _fitAll() {
     if (_r == null) return;
-    final points = <LatLng>[
-      _pickup,
-      if (_dropoff != null) _dropoff!,
-      if (_me != null) _me!,
-      if (_driverLive != null) _driverLive!,
-    ];
-    if (points.length == 1) {
-      _mapController.move(_pickup, 15);
+    final me = _me;
+    if (me == null) {
+      _mapController.move(_target, 15);
       return;
     }
     _mapController.fitCamera(
       CameraFit.coordinates(
-        coordinates: points,
+        coordinates: _routePoints.length > 1 ? _routePoints : [_target, me],
         padding: _fitPadding,
         maxZoom: 17,
       ),
@@ -374,7 +518,6 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
   Widget _buildMap() {
     final me = _me;
     final dropoff = _dropoff;
-    final live = _driverLive;
 
     return FlutterMap(
       mapController: _mapController,
@@ -397,46 +540,38 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: _appPackageName,
         ),
-        // Pickup -> drop-off (towing).
-        if (dropoff != null)
+        // Actual road route (same style as the driver tracking page).
+        if (_routePoints.isNotEmpty && _routeRelevant)
           PolylineLayer(
             polylines: [
               Polyline(
-                points: [_pickup, dropoff],
-                strokeWidth: 4,
-                color: Colors.black.withValues(alpha: 0.6),
-              ),
-            ],
-          ),
-        // Provider -> where they're heading next.
-        if (me != null && !_finished)
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: [me, _target],
-                strokeWidth: 3,
-                color: _brandRed.withValues(alpha: 0.5),
+                points: _routePoints,
+                strokeWidth: 5,
+                color: const Color.fromARGB(255, 0, 0, 0),
               ),
             ],
           ),
         MarkerLayer(
           markers: [
-            Marker(
-              point: _pickup,
-              width: 40,
-              height: 48,
-              alignment: Alignment.topCenter,
-              child: Image.asset(
-                _pickupPinPath,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.location_on,
-                  color: Colors.green,
-                  size: 40,
+            // Pickup point, until the car is being towed to the drop-off.
+            if (!_toDropoff)
+              Marker(
+                point: _pickup,
+                width: 40,
+                height: 48,
+                alignment: Alignment.topCenter,
+                child: Image.asset(
+                  _pickupPinPath,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.location_on,
+                    color: Colors.green,
+                    size: 40,
+                  ),
                 ),
               ),
-            ),
-            if (dropoff != null)
+            // Drop-off point once the towing service is in progress.
+            if (_toDropoff && dropoff != null)
               Marker(
                 point: dropoff,
                 width: 40,
@@ -448,36 +583,25 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                   size: 40,
                 ),
               ),
-            // The driver's live position (blue dot).
-            if (live != null && !_finished)
-              Marker(
-                point: live,
-                width: 22,
-                height: 22,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.blue,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black26, blurRadius: 4),
-                    ],
-                  ),
-                ),
-              ),
-            // This provider.
+            // This provider: an arrow that rotates to face the direction
+            // of travel.
             if (me != null)
               Marker(
                 point: me,
-                width: 40,
-                height: 40,
-                child: Image.asset(
-                  _assistanceIcon,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.local_shipping,
-                    color: _brandRed,
-                    size: 30,
+                width: 30,
+                height: 30,
+                child: AnimatedRotation(
+                  turns: _headingTurns - _arrowFacing / 360,
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOut,
+                  child: Image.asset(
+                    _arrowIcon,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.navigation_rounded,
+                      color: Colors.blue,
+                      size: 36,
+                    ),
                   ),
                 ),
               ),
