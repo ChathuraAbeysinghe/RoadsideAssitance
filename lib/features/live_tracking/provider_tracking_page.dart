@@ -17,15 +17,8 @@ import '../../services/tracking_registry.dart';
 
 const Color _brandRed = Color(0xFFE30613);
 const Color _success = Color(0xFF22C55E);
-const String _pickupPinPath = 'assets/images/pickup-point.png';
-
-/// Arrow showing this provider's position and direction of travel.
-const String _arrowIcon = 'assets/images/arrow.png';
-
-/// Which way the arrow image itself points, in degrees clockwise from "up":
-/// 0 = tip points to the top of the image, 90 = right, 180 = down, 270 = left.
-/// Change this if the arrow turns the wrong way.
-const double _arrowFacing = 0;
+const Color _pickupBlue = Color(0xFF1E88E5);
+const Color _dropOrange = Color(0xFFFB8C00);
 const String _appPackageName = 'com.example.roadside_assitance';
 const String _userAgent = 'RoadsideAssistance/1.0 (kavidupurnamal@gmail.com)';
 
@@ -114,6 +107,7 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
   // version used for animation so the arrow always turns the short way round.
   double _heading = 0;
   double _headingTurns = 0;
+  bool _hasHeading = false;
 
   // Road route provider -> pickup (or drop-off once towing).
   List<LatLng> _routePoints = [];
@@ -266,6 +260,7 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
     if (delta > 180) delta -= 360;
     _heading = heading;
     _headingTurns += delta / 360;
+    _hasHeading = true;
   }
 
   // ---------------- route ----------------
@@ -400,6 +395,106 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
       ),
     );
     if (confirm == true) _advance(RequestStatus.cancelled);
+  }
+
+  /// Confirmation sheet that slides up from the bottom.
+  Future<void> _confirmComplete() async {
+    final confirm = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      showDragHandle: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 12, 22, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 22),
+              Center(
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: _success.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    size: 36,
+                    color: _success,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Complete service?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Confirm that the service is finished. The driver will be '
+                'told that the job is completed.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.4,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _brandRed,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Text(
+                    'Yes, complete',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                style: TextButton.styleFrom(foregroundColor: Colors.black87),
+                child: const Text(
+                  'Not yet',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirm == true) _advance(RequestStatus.completed);
   }
 
   Future<void> _callDriver() async {
@@ -553,56 +648,58 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
           ),
         MarkerLayer(
           markers: [
-            // Pickup point, until the car is being towed to the drop-off.
+            // Pickup point + label, until the car is being towed to the
+            // drop-off.
             if (!_toDropoff)
               Marker(
                 point: _pickup,
-                width: 40,
-                height: 48,
+                width: 250,
+                height: 92,
                 alignment: Alignment.topCenter,
-                child: Image.asset(
-                  _pickupPinPath,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.location_on,
-                    color: Colors.green,
-                    size: 40,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _AddressPill(
+                      tag: 'Pickup',
+                      color: _pickupBlue,
+                      text: _r!.pickupAddress.isEmpty
+                          ? 'Pickup point'
+                          : _r!.pickupAddress,
+                    ),
+                    const _PointDot(color: Colors.black),
+                  ],
                 ),
               ),
-            // Drop-off point once the towing service is in progress.
-            if (_toDropoff && dropoff != null)
+            // Drop-off point + label (towing).
+            if (dropoff != null && !_finished)
               Marker(
                 point: dropoff,
-                width: 40,
-                height: 40,
+                width: 250,
+                height: 92,
                 alignment: Alignment.topCenter,
-                child: const Icon(
-                  Icons.location_on,
-                  color: Color.fromARGB(255, 210, 0, 0),
-                  size: 40,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _AddressPill(
+                      tag: 'Drop',
+                      color: _dropOrange,
+                      text: (_r!.dropoffAddress ?? '').isEmpty
+                          ? 'Drop-off point'
+                          : _r!.dropoffAddress!,
+                    ),
+                    const _PointDot(color: _brandRed),
+                  ],
                 ),
               ),
-            // This provider: an arrow that rotates to face the direction
-            // of travel.
+            // This provider: blue live dot with a direction cone.
             if (me != null)
               Marker(
                 point: me,
-                width: 30,
-                height: 30,
-                child: AnimatedRotation(
-                  turns: _headingTurns - _arrowFacing / 360,
-                  duration: const Duration(milliseconds: 600),
-                  curve: Curves.easeOut,
-                  child: Image.asset(
-                    _arrowIcon,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.navigation_rounded,
-                      color: Colors.blue,
-                      size: 36,
-                    ),
-                  ),
+                width: 64,
+                height: 64,
+                child: _HeadingDot(
+                  turns: _headingTurns,
+                  showCone: _hasHeading && !_finished,
                 ),
               ),
           ],
@@ -734,7 +831,7 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                           ? Image.network(
                               user.profileImagePath,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => fallbackAvatar,
+                              errorBuilder: (_, _, _) => fallbackAvatar,
                               loadingBuilder: (context, child, progress) =>
                                   progress == null ? child : fallbackAvatar,
                             )
@@ -890,7 +987,7 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
             child: Image.asset(
               asset,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (_, _, _) =>
                   Icon(fallback, size: 20, color: Colors.black87),
             ),
           ),
@@ -1270,7 +1367,11 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
             child: ElevatedButton(
               onPressed: _busy
                   ? null
-                  : (step == null ? _back : () => _advance(step.$2)),
+                  : (step == null
+                        ? _back
+                        : () => step.$2 == RequestStatus.completed
+                              ? _confirmComplete()
+                              : _advance(step.$2)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _brandRed,
                 foregroundColor: Colors.white,
@@ -1321,4 +1422,177 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
       ),
     );
   }
+}
+
+/// White pill with a coloured tag, e.g. [Pickup] 123 Main Rd.
+class _AddressPill extends StatelessWidget {
+  final String tag;
+  final Color color;
+  final String text;
+
+  const _AddressPill({
+    required this.tag,
+    required this.color,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 240),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(5, 5, 14, 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                tag,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Pickup / drop-off marker: a ring-style dot (solid colour with a white
+/// centre) under the label. The dot's centre sits exactly on the map point.
+class _PointDot extends StatelessWidget {
+  final Color color;
+
+  const _PointDot({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 6),
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+          ),
+          child: Center(
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ),
+        // Pushes the dot's centre onto the point (marker is bottom-anchored).
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+}
+
+/// Blue live-location dot. The translucent cone rotates smoothly to point in
+/// the direction of travel (like Google Maps).
+class _HeadingDot extends StatelessWidget {
+  final double turns;
+  final bool showCone;
+
+  const _HeadingDot({required this.turns, required this.showCone});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 64,
+      height: 64,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (showCone)
+            AnimatedRotation(
+              turns: turns,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOut,
+              child: CustomPaint(
+                size: const Size(64, 64),
+                painter: _ConePainter(),
+              ),
+            ),
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: Colors.blue,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 4),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2;
+    const spread = math.pi / 3; // total cone angle (60 degrees)
+    final rect = Rect.fromCircle(center: c, radius: r);
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.blue.withValues(alpha: 0.55),
+          Colors.blue.withValues(alpha: 0.0),
+        ],
+      ).createShader(rect);
+    // Up (north) is -pi/2 in canvas angles.
+    canvas.drawArc(rect, -math.pi / 2 - spread / 2, spread, true, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
