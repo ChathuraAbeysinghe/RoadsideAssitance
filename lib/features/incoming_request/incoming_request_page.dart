@@ -13,8 +13,8 @@ import '../../entities/app_user.dart';
 import '../../entities/service_request.dart';
 
 const Color _brandRed = Color(0xFFE30613);
+const Color _dropoffOrange = Color(0xFFFF8C00);
 const Color _success = Color(0xFF22C55E);
-const Color _pickupBlue = Color(0xFF1E88E5);
 
 /// Cash icon shown next to the price.
 const String _cashIcon = 'assets/images/cash.png';
@@ -360,7 +360,7 @@ class _IncomingRequestPageState extends State<IncomingRequestPage> {
           ),
         MarkerLayer(
           markers: [
-            // Pickup point + label.
+            // Pickup point + label (red).
             Marker(
               point: _pickup,
               width: 250,
@@ -368,15 +368,15 @@ class _IncomingRequestPageState extends State<IncomingRequestPage> {
               child: _LabeledDot(
                 pill: _AddressPill(
                   tag: 'Pickup',
-                  color: _pickupBlue,
+                  color: _brandRed,
                   text: _r.pickupAddress.isEmpty
                       ? 'Pickup point'
                       : _r.pickupAddress,
                 ),
-                color: Colors.black,
+                color: _brandRed,
               ),
             ),
-            // Drop-off point + label (towing).
+            // Drop-off point + label (orange, towing).
             if (dropoff != null)
               Marker(
                 point: dropoff,
@@ -385,12 +385,12 @@ class _IncomingRequestPageState extends State<IncomingRequestPage> {
                 child: _LabeledDot(
                   pill: _AddressPill(
                     tag: 'Drop',
-                    color: _brandRed,
+                    color: _dropoffOrange,
                     text: (_r.dropoffAddress ?? '').isEmpty
                         ? 'Drop-off point'
                         : _r.dropoffAddress!,
                   ),
-                  color: _brandRed,
+                  color: _dropoffOrange,
                 ),
               ),
             // This provider: blue live dot.

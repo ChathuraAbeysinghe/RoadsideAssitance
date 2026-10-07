@@ -17,8 +17,8 @@ import '../../services/customer_location_sharer.dart';
 import '../../services/tracking_registry.dart';
 
 const Color _brandRed = Color(0xFFE30613);
+const Color _dropoffOrange = Color(0xFFFF8C00);
 const Color _success = Color(0xFF22C55E);
-const Color _pickupBlue = Color(0xFF1E88E5);
 
 /// Top-down vehicle image.
 const String _providerVehicleIcon = 'assets/images/top-vehicle.png';
@@ -638,7 +638,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
           ),
         MarkerLayer(
           markers: [
-            // Pickup point + label, until the car is being towed to the
+            // Pickup point + label (red), until the car is being towed to the
             // drop-off.
             if (!_toDropoff)
               Marker(
@@ -648,15 +648,15 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                 child: _LabeledDot(
                   pill: _AddressPill(
                     tag: 'Pickup',
-                    color: _pickupBlue,
+                    color: _brandRed,
                     text: (_request?.pickupAddress ?? '').isEmpty
                         ? 'Pickup point'
                         : _request!.pickupAddress,
                   ),
-                  color: Colors.black,
+                  color: _brandRed,
                 ),
               ),
-            // Drop-off point + label (towing).
+            // Drop-off point + label (orange, towing).
             if (_dropoff != null && !_finished)
               Marker(
                 point: _dropoff!,
@@ -665,12 +665,12 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                 child: _LabeledDot(
                   pill: _AddressPill(
                     tag: 'Drop',
-                    color: _brandRed,
+                    color: _dropoffOrange,
                     text: (_request?.dropoffAddress ?? '').isEmpty
                         ? 'Drop-off point'
                         : _request!.dropoffAddress!,
                   ),
-                  color: _brandRed,
+                  color: _dropoffOrange,
                 ),
               ),
             // The driver: always a live blue GPS dot with a cone showing the
