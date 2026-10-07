@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../entities/app_user.dart';
@@ -9,9 +8,9 @@ import '../../entities/vehicle.dart';
 import 'request_searching_page.dart'; // adjust path if needed
 
 const Color _brandRed = Color(0xFFE30613);
+const Color _dropoffOrange = Color(0xFFFF8C00);
 const Color _editBlue = Color(0xFF1B7F9E);
 
-const String _truckPinIcon = 'assets/images/pickup-point.png';
 const String _cartoonTruck = 'assets/images/cartoon-truck.png';
 const String _cartoonMechanic = 'assets/images/cartoon-mechanic.png';
 const String _cartoonFuel = 'assets/images/cartoon-fuel.png';
@@ -20,9 +19,6 @@ const String _cartoonBattery = 'assets/images/cartoon-cables.png';
 const String _noteIcon = 'assets/images/note.png';
 const String _cashIcon = 'assets/images/cash.png';
 const String _cardIcon = 'assets/images/card.png';
-const String _pickupPinPath = 'assets/images/pickup-point.png';
-
-const String _appPackageName = 'com.example.roadside_assitance';
 
 /// Review screen shown after "Confirm" on the request page.
 ///
@@ -121,191 +117,43 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       // The keyboard opens over a bottom sheet (which handles its own
-      // insets). Without this, the page and map behind it get re-laid out
-      // on every keyboard animation frame, which causes the lag.
+      // insets). Without this, the page behind it gets re-laid out on every
+      // keyboard animation frame, which causes lag.
       resizeToAvoidBottomInset: false,
-      body: Column(
-        children: [
-          Expanded(
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: -30,
-                  child: _buildMap(),
-                ),
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 16, top: 8),
-                    child: Material(
-                      color: Colors.white,
-                      shape: const CircleBorder(),
-                      elevation: 3,
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () => Navigator.of(context).pop(),
-                        child: const SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: Icon(
-                            Icons.chevron_left,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // OpenStreetMap requires visible attribution.
-                SafeArea(
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 4, right: 4),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      color: Colors.white.withValues(alpha: 0.75),
-                      child: const Text(
-                        '© OpenStreetMap contributors',
-                        style: TextStyle(fontSize: 10, color: Colors.black87),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_left, color: Colors.black87, size: 30),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Request Summary',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
           ),
-          _buildSheet(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMap() {
-    final dropoff = widget.dropoff;
-    final fitPoints = widget.routePoints.isNotEmpty
-        ? widget.routePoints
-        : [widget.pickup, if (dropoff != null) dropoff];
-
-    return FlutterMap(
-      options: MapOptions(
-        // Single-location services just center on the pin.
-        initialCenter: widget.pickup,
-        initialZoom: 16,
-        initialCameraFit: dropoff == null
-            ? null
-            : CameraFit.coordinates(
-                coordinates: fitPoints,
-                padding: const EdgeInsets.fromLTRB(50, 90, 50, 60),
-              ),
-        // Read-only preview of the route.
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.none,
         ),
       ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: _appPackageName,
-        ),
-        if (widget.routePoints.isNotEmpty)
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: widget.routePoints,
-                strokeWidth: 5,
-                color: Colors.black,
-              ),
-            ],
-          ),
-        MarkerLayer(
-          markers: [
-            Marker(
-              point: widget.pickup,
-              width: 40,
-              height: 48,
-              alignment: Alignment.topCenter,
-              child: Image.asset(
-                _pickupPinPath,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.location_on,
-                  color: Colors.green,
-                  size: 40,
-                ),
-              ),
-            ),
-            if (dropoff != null)
-              Marker(
-                point: dropoff,
-                width: 40,
-                height: 40,
-                alignment: Alignment.topCenter,
-                child: const Icon(
-                  Icons.location_on,
-                  color: Colors.black,
-                  size: 40,
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSheet() {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.78,
-      ),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + bottomInset),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 15,
-              offset: const Offset(0, -3),
-            ),
-          ],
-        ),
+      body: SafeArea(
+        top: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(3),
-                ),
+            // Only the details scroll; the Confirm button stays fixed.
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: _buildServiceDetails(),
               ),
             ),
-            const SizedBox(height: 14),
-            const Center(
-              child: Text(
-                'Request Summary',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: _buildConfirmButton(),
             ),
-            const SizedBox(height: 18),
-            // Only the details scroll; header and Confirm stay fixed.
-            Flexible(
-              child: SingleChildScrollView(child: _buildServiceDetails()),
-            ),
-            const SizedBox(height: 16),
-            _buildConfirmButton(),
           ],
         ),
       ),
@@ -338,13 +186,8 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
             children: [
               Column(
                 children: [
-                  Image.asset(
-                    _truckPinIcon,
-                    width: 24,
-                    height: 24,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.local_shipping_outlined, size: 24),
-                  ),
+                  // Pickup: red dot (same as the map).
+                  const _LocationDot(color: _brandRed),
                   ...List.generate(
                     4,
                     (_) => Container(
@@ -354,7 +197,8 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
                       color: Colors.black87,
                     ),
                   ),
-                  const Icon(Icons.location_on_outlined, size: 24),
+                  // Drop-off: orange dot (same as the map).
+                  const _LocationDot(color: _dropoffOrange),
                 ],
               ),
               const SizedBox(width: 16),
@@ -420,7 +264,7 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(
             children: [
-              const Icon(Icons.location_on_outlined, size: 24),
+              const _LocationDot(color: _brandRed),
               const SizedBox(width: 16),
               Expanded(child: _addressText(widget.pickupAddress)),
             ],
@@ -951,6 +795,39 @@ class _NotesSheetState extends State<_NotesSheet> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Ring-style dot (same look as the confirmed-point dots on the map),
+/// used as the location icon next to the address text.
+class _LocationDot extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const _LocationDot({required this.color, this.size = 24});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      ),
+      child: Center(
+        child: Container(
+          width: size * 0.375,
+          height: size * 0.375,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+          ),
         ),
       ),
     );
