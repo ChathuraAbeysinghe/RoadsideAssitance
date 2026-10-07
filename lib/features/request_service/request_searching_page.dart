@@ -516,77 +516,82 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     );
   }
 
+  /// 1.0 right when the radar sweep passes over the provider, fading to 0
+  /// by the time it comes around again (like a real radar blip).
+  double _blipOpacity(double leadDeg, LatLng point) {
+    const distance = Distance();
+    final bearing = (distance.bearing(widget.pickup, point) + 360) % 360;
+    // Degrees since the sweep line passed over this provider.
+    final since = (leadDeg - bearing + 360) % 360;
+    return math.pow(1 - since / 360, 2).toDouble().clamp(0.0, 1.0);
+  }
+
   Widget _buildProviderMarkers(double radiusM) {
-    final nearby = _nearbyWithin(radiusM);
+    return AnimatedBuilder(
+      animation: _radarAnim,
+      builder: (context, _) {
+        final lead = _radarAnim.value * 360;
+        final nearby = _nearbyWithin(radiusM);
 
-    NearbyProvider? selected;
-    for (final p in nearby) {
-      if (p.uid == _selectedUid) selected = p;
-    }
+        NearbyProvider? selected;
+        for (final p in nearby) {
+          if (p.uid == _selectedUid) selected = p;
+        }
 
-    return MarkerLayer(
-      markers: [
-        for (final p in nearby)
-          Marker(
-            key: ValueKey(p.uid),
-            point: LatLng(p.location.latitude, p.location.longitude),
-            width: 38,
-            height: 38,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _selectedUid = p.uid),
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: p.uid == _selectedUid
-                        ? _brandRed
-                        : Colors.grey.shade300,
-                    width: p.uid == _selectedUid ? 2 : 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.22),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+        return MarkerLayer(
+          markers: [
+            for (final p in nearby)
+              () {
+                final point = LatLng(p.location.latitude, p.location.longitude);
+                final isSelected = p.uid == _selectedUid;
+                // Selected provider stays fully visible so its card is usable.
+                final opacity = isSelected ? 1.0 : _blipOpacity(lead, point);
+                return Marker(
+                  key: ValueKey(p.uid),
+                  point: point,
+                  width: 30,
+                  height: 30,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() => _selectedUid = p.uid),
+                    child: Opacity(
+                      opacity: opacity,
+                      child: Image.asset(
+                        _assistanceIcon,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.local_shipping,
+                          color: _brandRed,
+                          size: 26,
+                        ),
+                      ),
                     ),
+                  ),
+                );
+              }(),
+            // Info card, added last so it draws on top. It sits just above the
+            // tapped icon, like an info window on Google Maps.
+            if (selected != null)
+              Marker(
+                key: ValueKey('card-${selected.uid}'),
+                point: LatLng(
+                  selected.location.latitude,
+                  selected.location.longitude,
+                ),
+                width: 240,
+                height: 130,
+                alignment: Alignment.topCenter,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _buildProviderCard(selected.uid),
+                    const SizedBox(height: 26), // clears the icon
                   ],
                 ),
-                child: Image.asset(
-                  _assistanceIcon,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.local_shipping,
-                    color: _brandRed,
-                    size: 18,
-                  ),
-                ),
               ),
-            ),
-          ),
-        // Info card, added last so it draws on top. It sits just above the
-        // tapped icon, like an info window on Google Maps.
-        if (selected != null)
-          Marker(
-            key: ValueKey('card-${selected.uid}'),
-            point: LatLng(
-              selected.location.latitude,
-              selected.location.longitude,
-            ),
-            width: 240,
-            height: 130,
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _buildProviderCard(selected.uid),
-                const SizedBox(height: 26), // clears the icon
-              ],
-            ),
-          ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -766,6 +771,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
         if (searching) _buildSweep(radiusM),
         if (searching) _buildSweepEdge(radiusM),
         // Nearby assistance, live, only those inside the search radius.
+        // Each icon blips in as the sweep passes and fades until the next pass.
         if (searching) _buildProviderMarkers(radiusM),
         // The customer's pickup point, always on top.
         _buildPickupMarker(),
