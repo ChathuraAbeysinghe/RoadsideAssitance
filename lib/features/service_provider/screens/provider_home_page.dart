@@ -11,6 +11,7 @@ import '../../../entities/service_request.dart';
 import '../../../services/provider_location_service.dart';
 import '../../_share/navbar/app_bottom_nav_bar.dart';
 import '../services/provider_repository.dart';
+import '../../incoming_request/incoming_request_page.dart';
 import 'provider_job_page.dart';
 import 'provider_jobs_page.dart';
 import 'provider_notifications_page.dart';
@@ -894,7 +895,40 @@ class _RequestCardState extends State<_RequestCard> {
                     style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                   ),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : () async {
+                      final result = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          fullscreenDialog: true,
+                          builder: (_) => IncomingRequestPage(request: r),
+                        ),
+                      );
+                      if (result == false && mounted) {
+                        widget.onDecline();
+                      }
+                    },
+                    icon: const Icon(Icons.info_outline, color: _brandRed),
+                    label: const Text(
+                      'View Details',
+                      style: TextStyle(
+                        color: _brandRed,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _brandRed),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -1034,6 +1068,13 @@ class JobHistoryTile extends StatelessWidget {
       ),
       color: Colors.white,
       child: ListTile(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ProviderJobPage(requestId: job.id),
+            ),
+          );
+        },
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
           padding: const EdgeInsets.all(10),

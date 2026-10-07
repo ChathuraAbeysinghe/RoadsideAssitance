@@ -338,25 +338,10 @@ class IncomingRequestListener {
     return null;
   }
 
-  /// Opens the incoming request page and waits until the provider closes it.
-  /// If they accepted, opens the provider tracking page and waits for that
-  /// too, so no new request pops up over a job they just started.
   Future<bool> _show(ServiceRequest r) async {
-    final nav = _navKey?.currentState;
-    final builder = _incomingBuilder;
-    if (nav == null || builder == null) return false;
-    _log('showing request ${r.id}');
-
-    final accepted = await nav.push<bool>(
-      MaterialPageRoute(fullscreenDialog: true, builder: (_) => builder(r)),
-    );
-
-    if (accepted == true && nav.mounted) {
-      _log('accepted ${r.id}, opening provider tracking page');
-      _providerOpened.add(r.id);
-      await _pushPage(_providerTrackingBuilder, r);
-    }
-    return true;
+    // Automatically showing full-screen or popup is disabled as per user request.
+    // The provider will see new requests only in the ProviderHomePage.
+    return false;
   }
 
   // ---------------- provider: own jobs ----------------
