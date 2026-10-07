@@ -147,6 +147,9 @@ IconData _serviceFallbackIcon(ServiceType t) => switch (t) {
 /// All of the logged-in driver's requests, split into
 /// Ongoing / Completed / Cancelled (expired requests are listed under
 /// Cancelled with an "Expired" badge).
+///
+/// When the driver has no ongoing request, the page opens on the
+/// "Completed" tab instead of the empty "Ongoing" tab.
 class RequestsPage extends StatefulWidget {
   final UserType userType;
 
@@ -156,8 +159,20 @@ class RequestsPage extends StatefulWidget {
   State<RequestsPage> createState() => _RequestsPageState();
 }
 
-class _RequestsPageState extends State<RequestsPage> {
+class _RequestsPageState extends State<RequestsPage>
+    with SingleTickerProviderStateMixin {
   late final Stream<List<ServiceRequest>> _stream = _watchMine();
+  late final TabController _tabs = TabController(length: 3, vsync: this);
+
+  /// The starting tab is chosen only once, when the first data arrives.
+  /// After that the driver's own tab choice is never overridden.
+  bool _initialTabChosen = false;
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
 
   /// Only filters by customerUid (no orderBy) so no composite index is
   /// needed; sorting newest-first happens on the device.
@@ -181,97 +196,107 @@ class _RequestsPageState extends State<RequestsPage> {
         });
   }
 
+  /// No ongoing requests -> start on the "Completed" tab.
+  void _chooseInitialTab(bool hasOngoing) {
+    if (_initialTabChosen) return;
+    _initialTabChosen = true;
+    if (hasOngoing) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _tabs.index = 1; // 0 = Ongoing, 1 = Completed
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
         backgroundColor: Colors.white,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          centerTitle: true,
-          title: const Text(
-            'Requests',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-          bottom: TabBar(
-            labelColor: Colors.black,
-            unselectedLabelColor: Colors.grey.shade600,
-            indicatorColor: Colors.black,
-            indicatorWeight: 2.5,
-            dividerColor: Colors.grey.shade200,
-            labelStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-            tabs: const [
-              Tab(text: 'Ongoing'),
-              Tab(text: 'Completed'),
-              Tab(text: 'Cancelled'),
-            ],
-          ),
+        foregroundColor: Colors.black87,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        title: const Text(
+          'Requests',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
-        body: StreamBuilder<List<ServiceRequest>>(
-          stream: _stream,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) return _buildError();
-            if (!snapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(color: _brandRed),
-              );
-            }
-
-            final all = snapshot.data!;
-            final ongoing = <ServiceRequest>[];
-            final completed = <ServiceRequest>[];
-            final cancelled = <ServiceRequest>[];
-            for (final r in all) {
-              final s = _effectiveStatus(r);
-              if (_isOngoing(s)) {
-                ongoing.add(r);
-              } else if (s == RequestStatus.completed) {
-                completed.add(r);
-              } else {
-                cancelled.add(r);
-              }
-            }
-
-            return TabBarView(
-              children: [
-                _RequestList(
-                  requests: ongoing,
-                  emptyImage: 'assets/images/ongoing.png',
-                  emptyIcon: Icons.hourglass_empty_rounded,
-                  emptyTitle: 'No ongoing requests',
-                  emptyMessage:
-                      'Requests that are being processed will appear here.',
-                ),
-                _RequestList(
-                  requests: completed,
-                  emptyImage: 'assets/images/complete.png',
-                  emptyIcon: Icons.task_alt_rounded,
-                  emptyTitle: 'No completed requests',
-                  emptyMessage: 'Finished requests will appear here.',
-                ),
-                _RequestList(
-                  requests: cancelled,
-                  emptyImage: 'assets/images/cancelled.png',
-                  emptyIcon: Icons.cancel_outlined,
-                  emptyTitle: 'No cancelled requests',
-                  emptyMessage:
-                      'Cancelled or expired requests will appear here.',
-                ),
-              ],
+        bottom: TabBar(
+          controller: _tabs,
+          labelColor: Colors.black,
+          unselectedLabelColor: Colors.grey.shade600,
+          indicatorColor: Colors.black,
+          indicatorWeight: 2.5,
+          dividerColor: Colors.grey.shade200,
+          labelStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+          tabs: const [
+            Tab(text: 'Ongoing'),
+            Tab(text: 'Completed'),
+            Tab(text: 'Cancelled'),
+          ],
+        ),
+      ),
+      body: StreamBuilder<List<ServiceRequest>>(
+        stream: _stream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return _buildError();
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(color: _brandRed),
             );
-          },
-        ),
-        bottomNavigationBar: AppBottomNavBar(
-          userType: widget.userType,
-          activeIndex: 1, // "Requests" is the 2nd tab
-        ),
+          }
+
+          final all = snapshot.data!;
+          final ongoing = <ServiceRequest>[];
+          final completed = <ServiceRequest>[];
+          final cancelled = <ServiceRequest>[];
+          for (final r in all) {
+            final s = _effectiveStatus(r);
+            if (_isOngoing(s)) {
+              ongoing.add(r);
+            } else if (s == RequestStatus.completed) {
+              completed.add(r);
+            } else {
+              cancelled.add(r);
+            }
+          }
+
+          _chooseInitialTab(ongoing.isNotEmpty);
+
+          return TabBarView(
+            controller: _tabs,
+            children: [
+              _RequestList(
+                requests: ongoing,
+                emptyImage: 'assets/images/ongoing.png',
+                emptyIcon: Icons.hourglass_empty_rounded,
+                emptyTitle: 'No ongoing requests',
+                emptyMessage:
+                    'Requests that are being processed will appear here.',
+              ),
+              _RequestList(
+                requests: completed,
+                emptyImage: 'assets/images/complete.png',
+                emptyIcon: Icons.task_alt_rounded,
+                emptyTitle: 'No completed requests',
+                emptyMessage: 'Finished requests will appear here.',
+              ),
+              _RequestList(
+                requests: cancelled,
+                emptyImage: 'assets/images/cancelled.png',
+                emptyIcon: Icons.cancel_outlined,
+                emptyTitle: 'No cancelled requests',
+                emptyMessage: 'Cancelled or expired requests will appear here.',
+              ),
+            ],
+          );
+        },
+      ),
+      bottomNavigationBar: AppBottomNavBar(
+        userType: widget.userType,
+        activeIndex: 1, // "Requests" is the 2nd tab
       ),
     );
   }

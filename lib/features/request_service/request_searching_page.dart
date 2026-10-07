@@ -11,6 +11,7 @@ import '../../entities/service_request.dart';
 import '../../services/customer_location_sharer.dart';
 
 const Color _brandRed = Color(0xFFE30613);
+const Color _success = Color(0xFF22C55E);
 
 const String _searchMapImage = 'assets/images/search-map.jpg';
 const String _searchMagnifierImage = 'assets/images/search-magnifier.png';
@@ -58,7 +59,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
   /// Drives the map + magnifying glass animation in the sheet.
   late final AnimationController _searchAnim;
 
-  /// Drives the pulse rings on the map.
+  /// Drives the radar (pulse rings + rotating sweep) on the map.
   late final AnimationController _radarAnim;
 
   StreamSubscription<ServiceRequest?>? _sub;
@@ -217,6 +218,15 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
         .toList();
   }
 
+  /// Providers that are inside the current search radius.
+  List<NearbyProvider> _nearbyWithin(double radiusM) {
+    const distance = Distance();
+    return _providers.where((p) {
+      final point = LatLng(p.location.latitude, p.location.longitude);
+      return distance.as(LengthUnit.Meter, widget.pickup, point) <= radiusM;
+    }).toList();
+  }
+
   /// Called whenever the user touches the map. Restarts the 5 second wait.
   void _scheduleRecenter() {
     _recenterTimer?.cancel();
@@ -247,18 +257,25 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel request?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Text(
+          'Cancel request?',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         content: const Text('We will stop looking for nearby assistance.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Keep searching'),
+            child: const Text(
+              'Keep searching',
+              style: TextStyle(color: Colors.black87),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text(
               'Cancel request',
-              style: TextStyle(color: _brandRed),
+              style: TextStyle(color: _brandRed, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -322,15 +339,17 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
                       child: Material(
                         color: Colors.white,
                         shape: const CircleBorder(),
-                        elevation: 3,
+                        elevation: 4,
+                        shadowColor: Colors.black38,
                         child: InkWell(
                           customBorder: const CircleBorder(),
                           onTap: _onCancelPressed,
                           child: const SizedBox(
-                            width: 40,
-                            height: 40,
+                            width: 42,
+                            height: 42,
                             child: Icon(
-                              Icons.chevron_left,
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 18,
                               color: Colors.black87,
                             ),
                           ),
@@ -348,7 +367,10 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
                           horizontal: 6,
                           vertical: 2,
                         ),
-                        color: Colors.white.withValues(alpha: 0.75),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                         child: const Text(
                           '© OpenStreetMap contributors',
                           style: TextStyle(fontSize: 10, color: Colors.black87),
@@ -366,9 +388,9 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     );
   }
 
-  // ---------------- Pulse rings ----------------
-  /// Rings that start at the pickup point and expand out to the edge of
-  /// the search radius, fading as they grow.
+  // ---------------- Radar ----------------
+  /// Soft filled rings that start at the pickup point and expand out to the
+  /// edge of the search radius, fading as they grow.
   Widget _buildPulseRings(double radiusM) {
     return AnimatedBuilder(
       animation: _radarAnim,
@@ -380,18 +402,15 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
             for (final offset in const [0.0, 1 / 3, 2 / 3])
               () {
                 final p = (v + offset) % 1;
+                // Ease-out so the ring slows down near the edge.
+                final eased = Curves.easeOut.transform(p);
                 return CircleMarker(
                   point: widget.pickup,
-                  radius: radiusM * p,
+                  radius: radiusM * eased,
                   useRadiusInMeter: true,
-                  color: Colors.transparent,
-                  borderColor: const Color.fromARGB(
-                    255,
-                    255,
-                    0,
-                    0,
-                  ).withValues(alpha: 0.6 * (1 - p)),
-                  borderStrokeWidth: 2.5,
+                  color: _brandRed.withValues(alpha: 0.10 * (1 - p)),
+                  borderColor: _brandRed.withValues(alpha: 0.55 * (1 - p)),
+                  borderStrokeWidth: 2,
                 );
               }(),
           ],
@@ -400,61 +419,179 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     );
   }
 
-  Widget _buildProviderMarkers(double radiusM) {
+  /// Rotating radar sweep: a wedge with a bright leading edge and a trail
+  /// that fades out behind it.
+  Widget _buildSweep(double radiusM) {
     const distance = Distance();
-    final nearby = _providers.where((p) {
-      final point = LatLng(p.location.latitude, p.location.longitude);
-      return distance.as(LengthUnit.Meter, widget.pickup, point) <= radiusM;
-    }).toList();
+    const slices = 14;
+    const sliceDeg = 3.0;
 
-    NearbyProvider? selected;
-    for (final p in nearby) {
-      if (p.uid == _selectedUid) selected = p;
-    }
+    return AnimatedBuilder(
+      animation: _radarAnim,
+      builder: (context, _) {
+        final lead = _radarAnim.value * 360;
+        LatLng at(double bearing) =>
+            distance.offset(widget.pickup, radiusM, bearing);
 
+        final polygons = <Polygon>[
+          for (var i = 0; i < slices; i++)
+            () {
+              final start = lead - (i + 1) * sliceDeg;
+              final end = lead - i * sliceDeg;
+              return Polygon(
+                points: [
+                  widget.pickup,
+                  at(start),
+                  at((start + end) / 2),
+                  at(end),
+                ],
+                color: _brandRed.withValues(alpha: 0.20 * (1 - i / slices)),
+              );
+            }(),
+        ];
+
+        return PolygonLayer(polygons: polygons);
+      },
+    );
+  }
+
+  Widget _buildSweepEdge(double radiusM) {
+    const distance = Distance();
+
+    return AnimatedBuilder(
+      animation: _radarAnim,
+      builder: (context, _) {
+        final lead = _radarAnim.value * 360;
+        return PolylineLayer(
+          polylines: [
+            Polyline(
+              points: [
+                widget.pickup,
+                distance.offset(widget.pickup, radiusM, lead),
+              ],
+              strokeWidth: 2,
+              color: _brandRed.withValues(alpha: 0.55),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// The customer's pickup point at the centre of the radar.
+  Widget _buildPickupMarker() {
     return MarkerLayer(
       markers: [
-        for (final p in nearby)
-          Marker(
-            key: ValueKey(p.uid),
-            point: LatLng(p.location.latitude, p.location.longitude),
-            width: 30,
-            height: 30,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _selectedUid = p.uid),
-              child: Image.asset(
-                _assistanceIcon,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.local_shipping,
-                  color: _brandRed,
-                  size: 20,
+        Marker(
+          point: widget.pickup,
+          width: 56,
+          height: 56,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _brandRed.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
                 ),
               ),
-            ),
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: _brandRed,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3.5),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black38, blurRadius: 6),
+                  ],
+                ),
+              ),
+            ],
           ),
-        // Info card, added last so it draws on top. It sits just above the
-        // tapped icon, like an info window on Google Maps.
-        if (selected != null)
-          Marker(
-            key: ValueKey('card-${selected.uid}'),
-            point: LatLng(
-              selected.location.latitude,
-              selected.location.longitude,
-            ),
-            width: 240,
-            height: 130,
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _buildProviderCard(selected.uid),
-                const SizedBox(height: 26), // clears the 44px icon
-              ],
-            ),
-          ),
+        ),
       ],
+    );
+  }
+
+  /// 1.0 right when the radar sweep passes over the provider, fading to 0
+  /// by the time it comes around again (like a real radar blip).
+  double _blipOpacity(double leadDeg, LatLng point) {
+    const distance = Distance();
+    final bearing = (distance.bearing(widget.pickup, point) + 360) % 360;
+    // Degrees since the sweep line passed over this provider.
+    final since = (leadDeg - bearing + 360) % 360;
+    return math.pow(1 - since / 360, 2).toDouble().clamp(0.0, 1.0);
+  }
+
+  Widget _buildProviderMarkers(double radiusM) {
+    return AnimatedBuilder(
+      animation: _radarAnim,
+      builder: (context, _) {
+        final lead = _radarAnim.value * 360;
+        final nearby = _nearbyWithin(radiusM);
+
+        NearbyProvider? selected;
+        for (final p in nearby) {
+          if (p.uid == _selectedUid) selected = p;
+        }
+
+        return MarkerLayer(
+          markers: [
+            for (final p in nearby)
+              () {
+                final point = LatLng(p.location.latitude, p.location.longitude);
+                final isSelected = p.uid == _selectedUid;
+                // Selected provider stays fully visible so its card is usable.
+                final opacity = isSelected ? 1.0 : _blipOpacity(lead, point);
+                return Marker(
+                  key: ValueKey(p.uid),
+                  point: point,
+                  width: 30,
+                  height: 30,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => setState(() => _selectedUid = p.uid),
+                    child: Opacity(
+                      opacity: opacity,
+                      child: Image.asset(
+                        _assistanceIcon,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.local_shipping,
+                          color: _brandRed,
+                          size: 26,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }(),
+            // Info card, added last so it draws on top. It sits just above the
+            // tapped icon, like an info window on Google Maps.
+            if (selected != null)
+              Marker(
+                key: ValueKey('card-${selected.uid}'),
+                point: LatLng(
+                  selected.location.latitude,
+                  selected.location.longitude,
+                ),
+                width: 240,
+                height: 130,
+                alignment: Alignment.topCenter,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _buildProviderCard(selected.uid),
+                    const SizedBox(height: 26), // clears the icon
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -467,12 +604,12 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: 0.22),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -486,7 +623,10 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
                   child: SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _brandRed,
+                    ),
                   ),
                 ),
               );
@@ -507,8 +647,8 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
 
   Widget _providerCardContent(AppUser user) {
     final fallbackAvatar = ColoredBox(
-      color: Colors.grey.shade300,
-      child: Icon(Icons.person, color: Colors.grey.shade600),
+      color: Colors.grey.shade200,
+      child: Icon(Icons.person_rounded, color: Colors.grey.shade500),
     );
     final hasPhoto = user.profileImagePath.isNotEmpty;
     final rating = user.rating;
@@ -542,21 +682,38 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.1,
                 ),
               ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  const Icon(Icons.star, size: 15, color: Colors.amber),
-                  const SizedBox(width: 3),
-                  Text(
-                    rating.count > 0
-                        ? '${rating.average.toStringAsFixed(1)} (${rating.count})'
-                        : 'No ratings yet',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                  ),
-                ],
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.star_rounded,
+                      size: 14,
+                      color: Colors.black87,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      rating.count > 0
+                          ? '${rating.average.toStringAsFixed(1)} (${rating.count})'
+                          : 'New provider',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -567,6 +724,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
 
   Widget _buildMap() {
     final radiusKm = _currentRadiusKm;
+    final radiusM = radiusKm * 1000;
     final searching = _status == RequestStatus.pending;
     return FlutterMap(
       mapController: _mapController,
@@ -600,28 +758,23 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
           circles: [
             CircleMarker(
               point: widget.pickup,
-              radius: radiusKm * 1000,
+              radius: radiusM,
               useRadiusInMeter: true,
-              color: const Color.fromARGB(
-                255,
-                253,
-                1,
-                1,
-              ).withValues(alpha: 0.08),
-              borderColor: const Color.fromARGB(
-                255,
-                255,
-                0,
-                0,
-              ).withValues(alpha: 0.4),
+              color: _brandRed.withValues(alpha: 0.06),
+              borderColor: _brandRed.withValues(alpha: 0.5),
               borderStrokeWidth: 1.5,
             ),
           ],
         ),
-        // Expanding rings (only while searching).
-        if (searching) _buildPulseRings(radiusKm * 1000),
+        // Radar: expanding rings + rotating sweep (only while searching).
+        if (searching) _buildPulseRings(radiusM),
+        if (searching) _buildSweep(radiusM),
+        if (searching) _buildSweepEdge(radiusM),
         // Nearby assistance, live, only those inside the search radius.
-        if (searching) _buildProviderMarkers(radiusKm * 1000),
+        // Each icon blips in as the sweep passes and fades until the next pass.
+        if (searching) _buildProviderMarkers(radiusM),
+        // The customer's pickup point, always on top.
+        _buildPickupMarker(),
       ],
     );
   }
@@ -630,9 +783,9 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
-        16,
+        18,
         10,
-        16,
+        18,
         16 + MediaQuery.of(context).padding.bottom,
       ),
       decoration: BoxDecoration(
@@ -640,24 +793,27 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 15,
-            offset: const Offset(0, -3),
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 18,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 44,
-            height: 5,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(3),
+          Center(
+            child: Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(3),
+              ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           _buildSheetContent(),
         ],
       ),
@@ -673,7 +829,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
       case RequestStatus.cancelled:
         return _buildMessage(
           icon: Icons.cancel_outlined,
-          color: Colors.grey,
+          color: Colors.grey.shade600,
           title: 'Request cancelled',
           subtitle: 'This request was cancelled.',
         );
@@ -688,61 +844,177 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
 
   // ---- Searching ----
   Widget _buildSearching() {
+    final radiusM = _currentRadiusKm * 1000;
+    final count = _nearbyWithin(radiusM).length;
+    final radiusLabel = _currentRadiusKm.toStringAsFixed(0);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Looking For Nearby Assistance',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        // Title + wait time
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Looking for nearby assistance',
+                    style: TextStyle(
+                      fontSize: 17.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.radar_rounded,
+                        size: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Searching within $radiusLabel km',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.schedule_rounded,
+                    size: 14,
+                    color: Colors.black87,
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    '~2 min',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 6),
-        Text(
-          'Searching within ${_currentRadiusKm.toStringAsFixed(0)} km…',
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-        ),
-        const SizedBox(height: 20),
-        _buildStageBars(),
         const SizedBox(height: 18),
-        _buildSearchAnimation(),
-        const SizedBox(height: 10),
-        const Text(
-          'Estimated wait time: 2 min',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        _buildStageBars(),
+        const SizedBox(height: 16),
+
+        // Live status strip
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              _buildSearchAnimation(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Contacting providers nearby',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: count > 0 ? _success : Colors.grey.shade400,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            count == 0
+                                ? 'Looking for available providers…'
+                                : '$count available within $radiusLabel km',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         SizedBox(
-          width: double.infinity,
-          height: 48,
+          height: 50,
           child: OutlinedButton(
             onPressed: _onCancelPressed,
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.black87,
-              side: BorderSide(color: Colors.grey.shade400),
+              foregroundColor: _brandRed,
+              backgroundColor: Colors.white,
+              side: BorderSide(color: _brandRed.withValues(alpha: 0.5)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
               ),
             ),
-            child: const Text('Cancel request'),
+            child: const Text(
+              'Cancel Request',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
           ),
         ),
       ],
     );
   }
 
-  /// Map image that gently pulses, with a magnifying glass sweeping
+  /// Compact map image that gently pulses, with a magnifying glass sweeping
   /// around it in a circle.
   Widget _buildSearchAnimation() {
-    const double size = 110;
+    const double size = 52;
     return SizedBox(
-      width: size + 40,
-      height: size + 40,
+      width: size + 22,
+      height: size + 22,
       child: AnimatedBuilder(
         animation: _searchAnim,
         builder: (context, _) {
           final t = _searchAnim.value * 2 * math.pi;
           final pulse = 1 + 0.04 * math.sin(t);
-          final dx = math.cos(t) * 20;
-          final dy = math.sin(t) * 14;
+          final dx = math.cos(t) * 10;
+          final dy = math.sin(t) * 7;
 
           return Stack(
             alignment: Alignment.center,
@@ -752,14 +1024,14 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
                 // Rounded corners since the map image is a .jpg
                 // (no transparency).
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                   child: Image.asset(
                     _searchMapImage,
                     width: size,
                     height: size,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Icon(
-                      Icons.map,
+                      Icons.map_rounded,
                       size: size * 0.8,
                       color: Colors.green.shade300,
                     ),
@@ -772,11 +1044,11 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
                   angle: math.sin(t) * 0.12,
                   child: Image.asset(
                     _searchMagnifierImage,
-                    width: size * 0.7,
-                    height: size * 0.7,
+                    width: size * 0.75,
+                    height: size * 0.75,
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => Icon(
-                      Icons.search,
+                      Icons.search_rounded,
                       size: size * 0.6,
                       color: Colors.grey.shade800,
                     ),
@@ -790,16 +1062,17 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     );
   }
 
-  /// One bar per stage. Past stages are full, the current one fills
-  /// smoothly with elapsed time, future ones are empty.
+  /// One bar per stage with its radius underneath. Past stages are full,
+  /// the current one fills smoothly with elapsed time, future ones are empty.
   Widget _buildStageBars() {
     return ValueListenableBuilder<int>(
       valueListenable: _elapsedNotifier,
       builder: (context, elapsed, _) {
         return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (var i = 0; i < _stageRadiiKm.length; i++) ...[
-              if (i > 0) const SizedBox(width: 8),
+              if (i > 0) const SizedBox(width: 6),
               Expanded(child: _stageBar(i, elapsed)),
             ],
           ],
@@ -820,32 +1093,48 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     } else {
       target = 0;
     }
+    final done = index <= _stage;
+    final current = index == _stage;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(2),
-      child: SizedBox(
-        height: 4,
-        child: Stack(
-          children: [
-            Positioned.fill(child: ColoredBox(color: Colors.grey.shade400)),
-            // Linear tween over 1s matches the timer tick, so the fill
-            // moves continuously instead of jumping.
-            TweenAnimationBuilder<double>(
-              tween: Tween<double>(end: target),
-              duration: const Duration(seconds: 1),
-              curve: Curves.linear,
-              builder: (context, value, _) => FractionallySizedBox(
-                widthFactor: value,
-                alignment: Alignment.centerLeft,
-                child: const ColoredBox(
-                  color: _brandRed,
-                  child: SizedBox.expand(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: SizedBox(
+            height: 5,
+            child: Stack(
+              children: [
+                Positioned.fill(child: ColoredBox(color: Colors.grey.shade200)),
+                // Linear tween over 1s matches the timer tick, so the fill
+                // moves continuously instead of jumping.
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: target),
+                  duration: const Duration(seconds: 1),
+                  curve: Curves.linear,
+                  builder: (context, value, _) => FractionallySizedBox(
+                    widthFactor: value,
+                    alignment: Alignment.centerLeft,
+                    child: const ColoredBox(
+                      color: _brandRed,
+                      child: SizedBox.expand(),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 6),
+        Text(
+          '${_stageRadiiKm[index].toStringAsFixed(0)} km',
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: current ? FontWeight.w800 : FontWeight.w500,
+            color: done ? Colors.black87 : Colors.grey.shade500,
+          ),
+        ),
+      ],
     );
   }
 
@@ -853,12 +1142,18 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
   Widget _buildExpired() {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Icon(Icons.search_off, size: 56, color: Colors.grey.shade500),
-        const SizedBox(height: 12),
+        _statusBadge(Icons.search_off_rounded, Colors.grey.shade600),
+        const SizedBox(height: 14),
         const Text(
           'No assistance found nearby',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.2,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
@@ -870,18 +1165,20 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
         _primaryButton('Try again', _onTryAgain),
         const SizedBox(height: 10),
         SizedBox(
-          width: double.infinity,
-          height: 48,
+          height: 50,
           child: OutlinedButton(
             onPressed: _leave,
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.black87,
-              side: BorderSide(color: Colors.grey.shade400),
+              side: BorderSide(color: Colors.grey.shade300),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
               ),
             ),
-            child: const Text('Close'),
+            child: const Text(
+              'Close',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
           ),
         ),
       ],
@@ -901,12 +1198,18 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
 
         return Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.check_circle, size: 56, color: Colors.green),
-            const SizedBox(height: 12),
+            _statusBadge(Icons.check_rounded, _success),
+            const SizedBox(height: 14),
             const Text(
               'Assistance found!',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
@@ -915,17 +1218,37 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
               style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
             if (rating != null && rating.count > 0) ...[
-              const SizedBox(height: 8),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.star, size: 18, color: Colors.amber),
-                  const SizedBox(width: 4),
-                  Text(
-                    rating.average.toStringAsFixed(1),
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+              const SizedBox(height: 10),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
                   ),
-                ],
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 16,
+                        color: Colors.black87,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${rating.average.toStringAsFixed(1)} (${rating.count})',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
             const SizedBox(height: 20),
@@ -944,16 +1267,23 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Icon(icon, size: 56, color: color),
-        const SizedBox(height: 12),
+        _statusBadge(icon, color),
+        const SizedBox(height: 14),
         Text(
           title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.2,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
           subtitle,
+          textAlign: TextAlign.center,
           style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 20),
@@ -962,10 +1292,24 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
     );
   }
 
+  /// Round, softly tinted icon badge used by the result states.
+  Widget _statusBadge(IconData icon, Color color) {
+    return Center(
+      child: Container(
+        width: 68,
+        height: 68,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: 34, color: color),
+      ),
+    );
+  }
+
   Widget _primaryButton(String label, VoidCallback onPressed) {
     return SizedBox(
-      width: double.infinity,
-      height: 52,
+      height: 54,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
@@ -978,7 +1322,7 @@ class _RequestSearchingPageState extends State<RequestSearchingPage>
         ),
         child: Text(
           label,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
     );
