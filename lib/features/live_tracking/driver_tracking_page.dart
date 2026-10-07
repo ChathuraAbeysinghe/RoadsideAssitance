@@ -18,6 +18,7 @@ import '../../services/tracking_registry.dart';
 
 const Color _brandRed = Color(0xFFE30613);
 const Color _success = Color(0xFF22C55E);
+const Color _pickupBlue = Color(0xFF1E88E5);
 
 /// Top-down vehicle image.
 const String _providerVehicleIcon = 'assets/images/top-vehicle.png';
@@ -144,6 +145,11 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
   DateTime _lastGesture = DateTime.fromMillisecondsSinceEpoch(0);
 
   RequestStatus get _status => _request?.status ?? RequestStatus.accepted;
+
+  bool get _finished =>
+      _status == RequestStatus.completed ||
+      _status == RequestStatus.cancelled ||
+      _status == RequestStatus.expired;
 
   /// Tow truck job that is under way: the route now goes to the drop-off.
   bool get _toDropoff =>
@@ -594,7 +600,6 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
     );
   }
 
-  // Map and its icons are unchanged.
   Widget _buildMap() {
     final provider = _providerLoc;
     return FlutterMap(
@@ -631,16 +636,39 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
           ),
         MarkerLayer(
           markers: [
-            if (_status == RequestStatus.inProgress && _dropoff != null)
+            // Pickup point + label, until the car is being towed to the
+            // drop-off.
+            if (!_toDropoff)
+              Marker(
+                point: widget.pickup,
+                width: 250,
+                height: 120,
+                child: _LabeledDot(
+                  pill: _AddressPill(
+                    tag: 'Pickup',
+                    color: _pickupBlue,
+                    text: (_request?.pickupAddress ?? '').isEmpty
+                        ? 'Pickup point'
+                        : _request!.pickupAddress,
+                  ),
+                  color: Colors.black,
+                ),
+              ),
+            // Drop-off point + label (towing).
+            if (_dropoff != null && !_finished)
               Marker(
                 point: _dropoff!,
-                width: 40,
-                height: 40,
-                alignment: Alignment.topCenter,
-                child: const Icon(
-                  Icons.location_on,
-                  color: Color.fromARGB(255, 210, 0, 0),
-                  size: 40,
+                width: 250,
+                height: 120,
+                child: _LabeledDot(
+                  pill: _AddressPill(
+                    tag: 'Drop',
+                    color: _brandRed,
+                    text: (_request?.dropoffAddress ?? '').isEmpty
+                        ? 'Drop-off point'
+                        : _request!.dropoffAddress!,
+                  ),
+                  color: _brandRed,
                 ),
               ),
             // The driver: always a live blue GPS dot with a cone showing the
@@ -665,7 +693,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                   child: Image.asset(
                     _providerVehicleIcon,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
+                    errorBuilder: (_, _, _) => const Icon(
                       Icons.local_shipping,
                       color: _brandRed,
                       size: 30,
@@ -970,7 +998,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                           ? Image.network(
                               user.profileImagePath,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => fallbackAvatar,
+                              errorBuilder: (_, _, _) => fallbackAvatar,
                               loadingBuilder: (context, child, progress) =>
                                   progress == null ? child : fallbackAvatar,
                             )
@@ -1160,7 +1188,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
             child: Image.asset(
               asset,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (_, _, _) =>
                   Icon(fallback, size: 20, color: Colors.black87),
             ),
           ),
@@ -1398,4 +1426,120 @@ class _ConePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// White pill with a coloured tag, e.g. [Pickup] 123 Main Rd.
+class _AddressPill extends StatelessWidget {
+  final String tag;
+  final Color color;
+  final String text;
+
+  const _AddressPill({
+    required this.tag,
+    required this.color,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 240),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(5, 5, 14, 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                tag,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Label pill above a ring-style dot (solid colour with a white centre).
+/// The marker is centred on the map point, and the dot is centred inside the
+/// marker, so the dot's middle sits exactly on the location. The pill floats
+/// above it.
+class _LabeledDot extends StatelessWidget {
+  final Widget pill;
+  final Color color;
+
+  const _LabeledDot({required this.pill, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    // Marker height is 120, so the centre is 60 from the bottom. The dot is
+    // 24 high (top at 72); the pill's bottom sits 6 above that (78).
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          bottom: 78,
+          left: 0,
+          right: 0,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [pill]),
+        ),
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+          ),
+          child: Center(
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

@@ -18,7 +18,6 @@ import '../../services/tracking_registry.dart';
 const Color _brandRed = Color(0xFFE30613);
 const Color _success = Color(0xFF22C55E);
 const Color _pickupBlue = Color(0xFF1E88E5);
-const Color _dropOrange = Color(0xFFFB8C00);
 const String _appPackageName = 'com.example.roadside_assitance';
 const String _userAgent = 'RoadsideAssistance/1.0 (kavidupurnamal@gmail.com)';
 
@@ -425,22 +424,6 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
                 ),
               ),
               const SizedBox(height: 22),
-              Center(
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: _success.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    size: 36,
-                    color: _success,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
               const Text(
                 'Complete service?',
                 textAlign: TextAlign.center,
@@ -654,20 +637,16 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
               Marker(
                 point: _pickup,
                 width: 250,
-                height: 92,
-                alignment: Alignment.topCenter,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _AddressPill(
-                      tag: 'Pickup',
-                      color: _pickupBlue,
-                      text: _r!.pickupAddress.isEmpty
-                          ? 'Pickup point'
-                          : _r!.pickupAddress,
-                    ),
-                    const _PointDot(color: Colors.black),
-                  ],
+                height: 120,
+                child: _LabeledDot(
+                  pill: _AddressPill(
+                    tag: 'Pickup',
+                    color: _pickupBlue,
+                    text: _r!.pickupAddress.isEmpty
+                        ? 'Pickup point'
+                        : _r!.pickupAddress,
+                  ),
+                  color: Colors.black,
                 ),
               ),
             // Drop-off point + label (towing).
@@ -675,20 +654,16 @@ class _ProviderTrackingPageState extends State<ProviderTrackingPage> {
               Marker(
                 point: dropoff,
                 width: 250,
-                height: 92,
-                alignment: Alignment.topCenter,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _AddressPill(
-                      tag: 'Drop',
-                      color: _dropOrange,
-                      text: (_r!.dropoffAddress ?? '').isEmpty
-                          ? 'Drop-off point'
-                          : _r!.dropoffAddress!,
-                    ),
-                    const _PointDot(color: _brandRed),
-                  ],
+                height: 120,
+                child: _LabeledDot(
+                  pill: _AddressPill(
+                    tag: 'Drop',
+                    color: _brandRed,
+                    text: (_r!.dropoffAddress ?? '').isEmpty
+                        ? 'Drop-off point'
+                        : _r!.dropoffAddress!,
+                  ),
+                  color: _brandRed,
                 ),
               ),
             // This provider: blue live dot with a direction cone.
@@ -1491,19 +1466,30 @@ class _AddressPill extends StatelessWidget {
   }
 }
 
-/// Pickup / drop-off marker: a ring-style dot (solid colour with a white
-/// centre) under the label. The dot's centre sits exactly on the map point.
-class _PointDot extends StatelessWidget {
+/// Label pill above a ring-style dot (solid colour with a white centre).
+/// The marker is centred on the map point, and the dot is centred inside the
+/// marker, so the dot's middle sits exactly on the location. The pill floats
+/// above it.
+class _LabeledDot extends StatelessWidget {
+  final Widget pill;
   final Color color;
 
-  const _PointDot({required this.color});
+  const _LabeledDot({required this.pill, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    // Marker height is 120, so the centre is 60 from the bottom. The dot is
+    // 24 high (top at 72); the pill's bottom sits 6 above that (78).
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
       children: [
-        const SizedBox(height: 6),
+        Positioned(
+          bottom: 78,
+          left: 0,
+          right: 0,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [pill]),
+        ),
         Container(
           width: 24,
           height: 24,
@@ -1524,8 +1510,6 @@ class _PointDot extends StatelessWidget {
             ),
           ),
         ),
-        // Pushes the dot's centre onto the point (marker is bottom-anchored).
-        const SizedBox(height: 12),
       ],
     );
   }
