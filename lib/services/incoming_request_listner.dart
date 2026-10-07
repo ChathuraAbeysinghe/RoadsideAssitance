@@ -19,12 +19,17 @@ typedef RequestPageBuilder = Widget Function(ServiceRequest request);
 /// Runs for the whole life of the app and drives navigation for BOTH roles.
 ///
 /// ASSISTANCE PROVIDER
-///   1. While available, watches pending requests (for the services they
-///      offer, inside the request's search radius) and opens the incoming
+///   1. While available (and offering at least one service), watches pending
+///      requests inside the request's search radius and opens the incoming
 ///      request page on top of whatever page is showing.
-///   2. On Accept, opens the provider tracking page.
-///   3. If the provider has an active job when the app starts (or it
+///   2. On Accept, opens the provider tracking page (once).
+///   3. While the provider is on a job, no new popups are shown. Waiting
+///      requests are shown as soon as the job is finished.
+///   4. If the provider has an active job when the app starts (or it
 ///      appears some other way), opens the provider tracking page for it.
+///   5. Watches the provider's own user document, so going online/offline
+///      or changing services starts/stops the request watch by itself.
+///      No manual refresh() call is needed from any page.
 ///
 /// DRIVER (customer)
 ///   - When a provider accepts the driver's request while the driver is on
@@ -45,8 +50,6 @@ typedef RequestPageBuilder = Widget Function(ServiceRequest request);
 ///       pickup: LatLng(r.pickup.latitude, r.pickup.longitude),
 ///     ),
 ///   );
-///
-/// Call `refresh()` after a provider changes availability or services.
 class IncomingRequestListener {
   IncomingRequestListener._();
   static final IncomingRequestListener instance = IncomingRequestListener._();
@@ -57,6 +60,7 @@ class IncomingRequestListener {
   RequestPageBuilder? _driverTrackingBuilder;
 
   StreamSubscription<User?>? _authSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSub;
   StreamSubscription<List<ServiceRequest>>?
   _pendingSub; // provider: new requests
   StreamSubscription<List<ServiceRequest>>? _jobSub; // provider: own jobs
@@ -64,6 +68,14 @@ class IncomingRequestListener {
 
   /// Logged-in user for the job / driver watches.
   String? _roleUid;
+
+  /// Uid whose user document is being watched.
+  String? _userDocUid;
+
+  /// Last seen "availability + services" of the provider. The user document
+  /// changes every few seconds (GPS), so the pending watch is only restarted
+  /// when this changes.
+  String _providerSig = '';
 
   // ---- provider: incoming requests ----
   /// Set while listening for pending requests.
@@ -113,6 +125,7 @@ class IncomingRequestListener {
   }
 
   /// Re-checks the logged-in user and starts/stops the right watches.
+  /// Called automatically on login; pages don't need to call it.
   Future<void> refresh() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -129,29 +142,69 @@ class IncomingRequestListener {
         _stopAll();
         return;
       }
-      final appUser = userFromMap(user.uid, data);
-
-      if (appUser is AssistanceProvider) {
-        _stopDriverWatch();
-        _startJobWatch(user.uid);
-        if (appUser.isAvailable && appUser.services.isNotEmpty) {
-          _savedLocation = appUser.currentLocation;
-          _startPending(user.uid, appUser.services);
-        } else {
-          _log('provider not available, not listening for new requests');
-          _stopPending();
-        }
-      } else {
-        _stopPending();
-        _stopJobWatch();
-        _startDriverWatch(user.uid);
-      }
+      _applyUser(user.uid, userFromMap(user.uid, data), force: true);
     } catch (e) {
       _log('refresh() failed: $e');
     }
   }
 
+  /// Applies the user's current role/state to the watches.
+  void _applyUser(String uid, AppUser appUser, {bool force = false}) {
+    if (appUser is AssistanceProvider) {
+      _stopDriverWatch();
+      _startJobWatch(uid);
+      _startUserWatch(uid);
+      _savedLocation = appUser.currentLocation;
+
+      final sig =
+          '${appUser.isAvailable}|'
+          '${(appUser.services.map((s) => s.name).toList()..sort()).join(',')}';
+      if (!force && sig == _providerSig) return;
+      _providerSig = sig;
+
+      if (appUser.isAvailable && appUser.services.isNotEmpty) {
+        _startPending(uid, appUser.services);
+      } else {
+        _log('provider not available, not listening for new requests');
+        _stopPending();
+      }
+    } else {
+      _stopUserWatch();
+      _stopPending();
+      _stopJobWatch();
+      _startDriverWatch(uid);
+    }
+  }
+
   // ---------------- start / stop ----------------
+  /// Watches the provider's own document so availability / service changes
+  /// are picked up without any page calling refresh().
+  void _startUserWatch(String uid) {
+    if (_userSub != null && _userDocUid == uid) return;
+    _userSub?.cancel();
+    _userDocUid = uid;
+    _userSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .listen((snap) {
+          final data = snap.data();
+          if (data == null) return;
+          try {
+            _applyUser(uid, userFromMap(uid, data));
+          } catch (e) {
+            _log('user doc parse failed: $e');
+          }
+        }, onError: (e) => _log('user stream error: $e'));
+  }
+
+  void _stopUserWatch() {
+    _userSub?.cancel();
+    _userSub = null;
+    _userDocUid = null;
+    _providerSig = '';
+  }
+
   void _startPending(String uid, Set<ServiceType> services) {
     _pendingSub?.cancel();
     _uid = uid;
@@ -174,6 +227,8 @@ class IncomingRequestListener {
     _jobSub = watchProviderJobs(uid).listen((list) {
       _latestJobs = list;
       _openProviderJobs();
+      // A finished job frees the provider: show any request that waited.
+      _drain();
     }, onError: (e) => _log('job stream error: $e'));
   }
 
@@ -216,6 +271,7 @@ class IncomingRequestListener {
     _stopPending();
     _stopJobWatch();
     _stopDriverWatch();
+    _stopUserWatch();
     _roleUid = null;
     _handled.clear();
     _providerOpened.clear();
@@ -233,6 +289,9 @@ class IncomingRequestListener {
     _drain();
   }
 
+  /// True while the provider has a job in progress.
+  bool get _onJob => _latestJobs.any((j) => kActiveStatuses.contains(j.status));
+
   /// Shows pending requests one at a time. While a page is open new ones
   /// wait; when it closes we look at the latest list again.
   Future<void> _drain() async {
@@ -240,6 +299,10 @@ class IncomingRequestListener {
     _busy = true;
     try {
       while (_uid != null) {
+        // Never interrupt a provider who is already on a job. This runs
+        // again when the job stream reports the job as finished.
+        if (_onJob) break;
+
         ServiceRequest? next;
         for (final r in _candidates()) {
           if (await _isNearby(r)) {
@@ -287,7 +350,8 @@ class IncomingRequestListener {
             .where('isActive', isEqualTo: true)
             .get();
         if (psSnap.docs.isNotEmpty) {
-          final locMap = psSnap.docs.first.data()['locationGeo'] as Map<String, dynamic>?;
+          final locMap =
+              psSnap.docs.first.data()['locationGeo'] as Map<String, dynamic>?;
           if (locMap != null) {
             final lat = locMap['latitude'];
             final lng = locMap['longitude'];
@@ -298,9 +362,9 @@ class IncomingRequestListener {
         }
       } catch (_) {}
     }
-    
+
     me ??= await _myPosition();
-    
+
     if (me == null) {
       _log('no position for this provider yet, skipping ${r.id}');
       return false;
@@ -338,10 +402,24 @@ class IncomingRequestListener {
     return null;
   }
 
+  /// Opens the incoming request page on top of whatever is showing and waits
+  /// until it closes. If the provider accepted, opens the tracking page once.
+  /// Returns false only if the app's navigator isn't ready yet.
   Future<bool> _show(ServiceRequest r) async {
-    // Automatically showing full-screen or popup is disabled as per user request.
-    // The provider will see new requests only in the ProviderHomePage.
-    return false;
+    final nav = _navKey?.currentState;
+    final builder = _incomingBuilder;
+    if (nav == null || builder == null || !nav.mounted) return false;
+
+    final accepted = await nav.push<bool>(
+      MaterialPageRoute(fullscreenDialog: true, builder: (_) => builder(r)),
+    );
+
+    if (accepted == true) {
+      // Stops _openProviderJobs from opening a second tracking page.
+      _providerOpened.add(r.id);
+      await _pushPage(_providerTrackingBuilder, r);
+    }
+    return true;
   }
 
   // ---------------- provider: own jobs ----------------
