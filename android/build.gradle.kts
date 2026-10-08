@@ -5,6 +5,18 @@ allprojects {
     }
 }
 
+// Force every plugin (library) module to compile against SDK 36.
+// Must come BEFORE evaluationDependsOn(":app") below.
+subprojects {
+    afterEvaluate {
+        if (plugins.hasPlugin("com.android.library")) {
+            extensions.configure<com.android.build.api.dsl.LibraryExtension> {
+                compileSdk = 36
+            }
+        }
+    }
+}
+
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
         .dir("../../build")
