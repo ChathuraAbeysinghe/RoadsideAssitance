@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../entities/app_user.dart';
 import '../_share/navbar/app_bottom_nav_bar.dart';
+import '../nearby_centers/service_centers_near_location_page.dart';
 import '../profile/profile_page.dart';
-import '../request_service/request_service.dart';
+import '../request_service/service_location_page.dart';
 
 class HomePage extends StatefulWidget {
   final UserType userType;
@@ -78,14 +81,51 @@ class _HomePageState extends State<HomePage> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) =>
-            RequestServicePage(serviceType: type, userType: widget.userType),
+            ServiceLocationPage(serviceType: type, userType: widget.userType),
+      ),
+    );
+  }
+
+  /// Carousel tap: get the phone's GPS location (fallback: Colombo)
+  /// and open the nearby service centers list.
+  Future<void> _openNearbyCenters() async {
+    LatLng location = const LatLng(6.9271, 79.8612); // Colombo fallback
+    String address = '';
+
+    try {
+      if (await Geolocator.isLocationServiceEnabled()) {
+        var perm = await Geolocator.checkPermission();
+        if (perm == LocationPermission.denied) {
+          perm = await Geolocator.requestPermission();
+        }
+        if (perm != LocationPermission.denied &&
+            perm != LocationPermission.deniedForever) {
+          final pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+            ),
+          ).timeout(const Duration(seconds: 10));
+          location = LatLng(pos.latitude, pos.longitude);
+          address = 'Current location';
+        }
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ServiceCentersNearLocationPage(
+          location: location,
+          address: address,
+        ),
       ),
     );
   }
 
   Future<void> _openProfile() async {
-    await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const ProfilePage()));
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ProfilePage()));
     // Refresh the header so a changed name shows up when you come back.
     if (!mounted) return;
     setState(() {
@@ -354,9 +394,8 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Vehicle Tow',
                                           imagePath: 'assets/images/towing.png',
                                           height: 110,
-                                          onTap: () => _openService(
-                                            ServiceType.towTruck,
-                                          ),
+                                          onTap: () =>
+                                              _openService(ServiceType.towTruck),
                                         ),
                                       ),
                                       const SizedBox(width: 14),
@@ -366,9 +405,8 @@ class _HomePageState extends State<HomePage> {
                                           imagePath:
                                               'assets/images/mechanic.png',
                                           height: 110,
-                                          onTap: () => _openService(
-                                            ServiceType.mechanic,
-                                          ),
+                                          onTap: () =>
+                                              _openService(ServiceType.mechanic),
                                         ),
                                       ),
                                     ],
@@ -441,7 +479,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                             const SizedBox(height: 20),
 
-                            // Auto-rotating carousel
+                            // Auto-rotating carousel (tap -> nearby service centers)
                             Padding(
                               padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                               child: Container(
@@ -457,30 +495,34 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                   ],
                                 ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: SizedBox(
-                                    height: 210,
-                                    width: double.infinity,
-                                    child: PageView.builder(
-                                      controller: _heroController,
-                                      itemCount: _heroImages.length,
-                                      onPageChanged: (index) {
-                                        _currentHeroPage = index;
-                                      },
-                                      itemBuilder: (context, index) {
-                                        return Image.asset(
-                                          _heroImages[index],
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) =>
-                                                  Container(
-                                                    color: const Color(
-                                                      0xFFE30613,
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: _openNearbyCenters,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: SizedBox(
+                                      height: 210,
+                                      width: double.infinity,
+                                      child: PageView.builder(
+                                        controller: _heroController,
+                                        itemCount: _heroImages.length,
+                                        onPageChanged: (index) {
+                                          _currentHeroPage = index;
+                                        },
+                                        itemBuilder: (context, index) {
+                                          return Image.asset(
+                                            _heroImages[index],
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) =>
+                                                    Container(
+                                                      color: const Color(
+                                                        0xFFE30613,
+                                                      ),
                                                     ),
-                                                  ),
-                                        );
-                                      },
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
