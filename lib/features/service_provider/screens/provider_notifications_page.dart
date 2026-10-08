@@ -63,7 +63,9 @@ class _ProviderNotificationsPageState extends State<ProviderNotificationsPage> {
             return const Center(child: Text('Unable to load notifications.'));
           }
           if (!snap.hasData) {
-            return const Center(child: CircularProgressIndicator(color: _brandRed));
+            return const Center(
+              child: CircularProgressIndicator(color: _brandRed),
+            );
           }
           final list = snap.data!;
           if (list.isEmpty) {
@@ -77,13 +79,20 @@ class _ProviderNotificationsPageState extends State<ProviderNotificationsPage> {
                       color: Colors.grey.shade100,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.notifications_none_rounded,
-                        size: 80, color: Colors.grey.shade400),
+                    child: Icon(
+                      Icons.notifications_none_rounded,
+                      size: 80,
+                      color: Colors.grey.shade400,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   const Text(
                     'No Notifications Yet',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -153,7 +162,11 @@ class _ProviderNotificationsPageState extends State<ProviderNotificationsPage> {
                                 color: _brandRed.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(_iconFor(n.type), color: _brandRed, size: 24),
+                              child: Icon(
+                                _iconFor(n.type),
+                                color: _brandRed,
+                                size: 24,
+                              ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -162,17 +175,29 @@ class _ProviderNotificationsPageState extends State<ProviderNotificationsPage> {
                                 children: [
                                   Text(
                                     n.title,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: Colors.black87,
+                                    ),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
                                     n.body,
-                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.4),
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 14,
+                                      height: 1.4,
+                                    ),
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
                                     formatWhen(n.createdAt),
-                                    style: TextStyle(color: Colors.grey.shade400, fontSize: 12, fontWeight: FontWeight.w600),
+                                    style: TextStyle(
+                                      color: Colors.grey.shade400,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ],
                               ),

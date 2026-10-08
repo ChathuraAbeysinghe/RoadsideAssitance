@@ -121,7 +121,7 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xfff8fafc),
+      backgroundColor: const Color(0xFFF5F5F5),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: _userStream,
         builder: (context, userSnap) {
@@ -201,12 +201,12 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  _Summary(label: 'Completed Jobs', value: '${todayDone.length}', icon: Icons.task_alt),
+                  _Summary(label: 'Completed Jobs', value: '${todayDone.length}', iconAsset: 'assets/icon/icon-coumpleat-operation.png'),
                   const SizedBox(width: 12),
                   _Summary(
                     label: 'Earnings',
                     value: 'Rs ${todayEarnings.toStringAsFixed(0)}',
-                    icon: Icons.payments_outlined,
+                    iconAsset: 'assets/icon/icon-income.png',
                     highlight: true,
                   ),
                 ],
@@ -219,11 +219,11 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
                     value: rating.count > 0
                         ? rating.average.toStringAsFixed(1)
                         : 'New',
-                    icon: Icons.star_border,
+                    iconAsset: 'assets/icon/icon-star.png',
                     green: rating.count > 0,
                   ),
                   const SizedBox(width: 12),
-                  _Summary(label: 'Total Jobs', value: '${completed.length}', icon: Icons.history),
+                  _Summary(label: 'Total Jobs', value: '${completed.length}', iconAsset: 'assets/icon/icon-sum.png'),
                 ],
               ),
               const SizedBox(height: 28),
@@ -1109,13 +1109,13 @@ class _InfoRow extends StatelessWidget {
 class _Summary extends StatelessWidget {
   final String label;
   final String value;
-  final IconData icon;
+  final String iconAsset;
   final bool highlight;
   final bool green;
   const _Summary({
     required this.label,
     required this.value,
-    required this.icon,
+    required this.iconAsset,
     this.highlight = false,
     this.green = false,
   });
@@ -1127,13 +1127,12 @@ class _Summary extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade100),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -1143,18 +1142,28 @@ class _Summary extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: highlight ? _brandRed.withValues(alpha: 0.1) : (green ? Colors.teal.withValues(alpha: 0.1) : Colors.grey.shade100),
-                    borderRadius: BorderRadius.circular(8),
+                    color: highlight
+                        ? _brandRed.withValues(alpha: 0.08)
+                        : (green
+                            ? Colors.teal.withValues(alpha: 0.08)
+                            : Colors.grey.shade50),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    icon,
-                    size: 16,
-                    color: highlight ? _brandRed : (green ? Colors.teal : Colors.grey.shade700),
+                  child: Image.asset(
+                    iconAsset,
+                    width: 22,
+                    height: 22,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.info_outline,
+                      size: 22,
+                      color: highlight ? _brandRed : (green ? Colors.teal : Colors.grey.shade700),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     label,
@@ -1192,6 +1201,14 @@ class JobHistoryTile extends StatelessWidget {
   final ServiceRequest job;
   const JobHistoryTile({super.key, required this.job});
 
+  String _iconForServiceType(ServiceType type) => switch (type) {
+    ServiceType.towTruck => 'assets/icon/icon-tow-truck.png',
+    ServiceType.mechanic => 'assets/icon/icon-automobile.png',
+    ServiceType.fuelDelivery => 'assets/icon/icon-gas-station.png',
+    ServiceType.flatTireChange => 'assets/icon/icon-wheels.png',
+    ServiceType.batteryBoost => 'assets/icon/icon-jump-start.png',
+  };
+
   @override
   Widget build(BuildContext context) {
     final done = job.status == RequestStatus.completed;
@@ -1201,77 +1218,100 @@ class JobHistoryTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ProviderJobPage(requestId: job.id),
-              ),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: (done ? Colors.green : Colors.grey).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    done ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                    color: done ? Colors.green : Colors.grey,
-                    size: 24,
-                  ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ProviderJobPage(requestId: job.id),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        serviceTypeTitle(job.serviceType),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+              );
+            },
+            child: IntrinsicHeight(
+              child: Row(
+                children: [
+                  // Red left accent border
+                  Container(
+                    width: 4,
+                    decoration: BoxDecoration(
+                      color: done
+                          ? Colors.green
+                          : Colors.grey.shade400,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${formatWhen(when)} • ${money(job.totalAmount)}',
-                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusColor(job.status).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    statusLabel(job.status).toUpperCase(),
-                    style: TextStyle(
-                      color: statusColor(job.status),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 10,
-                      letterSpacing: 0.5,
                     ),
                   ),
-                ),
-              ],
+                  // Service icon
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Image.asset(
+                        _iconForServiceType(job.serviceType),
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Icon(
+                          done ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                          color: done ? Colors.green : Colors.grey,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            serviceTypeTitle(job.serviceType),
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.black87),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${formatWhen(when)} • ${money(job.totalAmount)}',
+                            style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: statusColor(job.status).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        statusLabel(job.status).toUpperCase(),
+                        style: TextStyle(
+                          color: statusColor(job.status),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
