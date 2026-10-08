@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -14,10 +15,18 @@ import 'features/service_provider/screens/provider_home_page.dart';
 import 'firebase_options.dart';
 import 'services/incoming_request_listner.dart';
 import 'services/provider_location_service.dart';
+import 'services/push_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Push notifications: lets a provider be notified of new requests while
+  // the app is closed. The Cloud Function sends them.
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  // Not awaited, so the permission dialog doesn't hold up app start-up.
+  PushNotificationService.instance.init();
+
   // Shares an available provider's live location, whatever page is open.
   ProviderLocationService.instance.autoManage();
   // Opens the right page for each role (incoming request, provider tracking,
@@ -45,6 +54,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Roadside Assistance',
       navigatorKey: appNavigatorKey,
       theme: ThemeData(

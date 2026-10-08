@@ -120,7 +120,35 @@ class _ProviderJobsPageState extends State<ProviderJobsPage> {
                                 ),
                               ),
                               const SizedBox(height: 16),
-                              for (final j in history) JobHistoryTile(job: j),
+                              Builder(
+                                builder: (context) {
+                                  final historyByService = <ServiceType, List<ServiceRequest>>{};
+                                  for (final j in history) {
+                                    historyByService.putIfAbsent(j.serviceType, () => []).add(j);
+                                  }
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      for (final entry in historyByService.entries) ...[
+                                        Padding(
+                                          padding: const EdgeInsets.only(bottom: 12, top: 8),
+                                          child: Text(
+                                            serviceTypeTitle(entry.key).toUpperCase(),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.grey.shade400,
+                                              letterSpacing: 1.0,
+                                            ),
+                                          ),
+                                        ),
+                                        for (final j in entry.value) JobHistoryTile(job: j),
+                                        const SizedBox(height: 8),
+                                      ],
+                                    ],
+                                  );
+                                },
+                              ),
                             ],
                           ],
                         );

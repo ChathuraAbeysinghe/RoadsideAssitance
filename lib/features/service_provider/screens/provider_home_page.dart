@@ -603,6 +603,7 @@ class _PendingSection extends StatefulWidget {
 class _PendingSectionState extends State<_PendingSection> {
   late Stream<List<ServiceRequest>> _stream;
   late Stream<List<ProviderService>> _servicesStream;
+  final Set<String> _notifiedIds = {};
 
   @override
   void initState() {
@@ -754,6 +755,22 @@ class _PendingSectionState extends State<_PendingSection> {
               if (km <= r.searchRadiusKm) items.add((r, km));
             }
             items.sort((a, b) => a.$2.compareTo(b.$2));
+
+            for (final it in items) {
+              final r = it.$1;
+              if (!_notifiedIds.contains(r.id)) {
+                _notifiedIds.add(r.id);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  ProviderRepository().sendNotification(
+                    uid: widget.provider.uid,
+                    title: 'New Service Request',
+                    body: 'A new ${serviceTypeTitle(r.serviceType)} request is available nearby.',
+                    type: 'newRequest',
+                    requestId: r.id,
+                  );
+                });
+              }
+            }
 
             if (items.isEmpty) {
               return _info(

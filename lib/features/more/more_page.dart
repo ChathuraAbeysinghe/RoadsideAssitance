@@ -167,10 +167,37 @@ class MorePage extends StatelessWidget {
     );
   }
 
+  Widget _buildGroup(List<Widget> children) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            children: children,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xfff8fafc),
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
@@ -179,49 +206,63 @@ class MorePage extends StatelessWidget {
         centerTitle: true,
         title: const Text(
           'More',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: Colors.grey.shade100, height: 1),
         ),
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
           children: [
             _ProfileHeader(onTap: () => _open(context, const ProfilePage())),
-            const SizedBox(height: 16),
-            Divider(height: 1, color: Colors.grey.shade200),
-            _MoreTile(
-              icon: Icons.person_outline,
-              title: 'Profile',
-              onTap: () => _open(context, const ProfilePage()),
-            ),
-            _MoreTile(
-              icon: Icons.privacy_tip_outlined,
-              title: 'Privacy Policy',
-              onTap: () => _open(context, const PrivacyPolicyPage()),
-            ),
-            _MoreTile(
-              icon: Icons.description_outlined,
-              title: 'Terms & Conditions',
-              onTap: () => _open(context, const TermsPage()),
-            ),
-            _MoreTile(
-              icon: Icons.headset_mic_outlined,
-              title: 'Contact Us',
-              onTap: () => _showContact(context),
-            ),
-            _MoreTile(
-              icon: Icons.flag_outlined,
-              title: 'Report',
-              onTap: () => _open(context, const ReportPage()),
-            ),
-            const SizedBox(height: 12),
-            _MoreTile(
-              icon: Icons.logout,
-              title: 'Log out',
-              color: _brandRed,
-              showChevron: false,
-              onTap: () => _logout(context),
-            ),
+            const SizedBox(height: 24),
+            _buildGroup([
+              _MoreTile(
+                icon: Icons.person_outline,
+                title: 'Profile',
+                onTap: () => _open(context, const ProfilePage()),
+                showDivider: false,
+              ),
+            ]),
+            _buildGroup([
+              _MoreTile(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Privacy Policy',
+                onTap: () => _open(context, const PrivacyPolicyPage()),
+              ),
+              _MoreTile(
+                icon: Icons.description_outlined,
+                title: 'Terms & Conditions',
+                onTap: () => _open(context, const TermsPage()),
+                showDivider: false,
+              ),
+            ]),
+            _buildGroup([
+              _MoreTile(
+                icon: Icons.headset_mic_outlined,
+                title: 'Contact Us',
+                onTap: () => _showContact(context),
+              ),
+              _MoreTile(
+                icon: Icons.flag_outlined,
+                title: 'Report',
+                onTap: () => _open(context, const ReportPage()),
+                showDivider: false,
+              ),
+            ]),
+            _buildGroup([
+              _MoreTile(
+                icon: Icons.logout,
+                title: 'Log out',
+                color: _brandRed,
+                showChevron: false,
+                showDivider: false,
+                onTap: () => _logout(context),
+              ),
+            ]),
           ],
         ),
       ),
@@ -239,6 +280,7 @@ class _MoreTile extends StatelessWidget {
   final VoidCallback onTap;
   final Color? color;
   final bool showChevron;
+  final bool showDivider;
 
   const _MoreTile({
     required this.icon,
@@ -246,39 +288,52 @@ class _MoreTile extends StatelessWidget {
     required this.onTap,
     this.color,
     this.showChevron = true,
+    this.showDivider = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final fg = color ?? Colors.black87;
+    final iconBg = color?.withValues(alpha: 0.1) ?? Colors.grey.shade50;
+    
     return Column(
       children: [
         InkWell(
-          borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             child: Row(
               children: [
-                Icon(icon, size: 24, color: fg),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, size: 22, color: fg),
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
                     title,
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       color: fg,
                     ),
                   ),
                 ),
                 if (showChevron)
-                  Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                  Icon(Icons.chevron_right_rounded, color: Colors.grey.shade300),
               ],
             ),
           ),
         ),
-        Divider(height: 1, color: Colors.grey.shade200),
+        if (showDivider)
+          Padding(
+            padding: const EdgeInsets.only(left: 62),
+            child: Divider(height: 1, color: Colors.grey.shade100),
+          ),
       ],
     );
   }
@@ -316,43 +371,70 @@ class _ProfileHeader extends StatelessWidget {
         );
 
         return InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24),
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            decoration: BoxDecoration(
+               color: Colors.white,
+               borderRadius: BorderRadius.circular(24),
+               border: Border.all(color: Colors.grey.shade100),
+               boxShadow: [
+                 BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
+               ]
+            ),
             child: Column(
               children: [
-                SizedBox(
-                  width: 96,
-                  height: 96,
-                  child: ClipOval(
-                    child: photo.isNotEmpty
-                        ? Image.network(
-                            photo,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => fallback,
-                            loadingBuilder: (context, child, progress) =>
-                                progress == null ? child : fallback,
-                          )
-                        : fallback,
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 4),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4)),
+                    ]
+                  ),
+                  child: SizedBox(
+                    width: 100,
+                    height: 100,
+                    child: ClipOval(
+                      child: photo.isNotEmpty
+                          ? Image.network(
+                              photo,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => fallback,
+                              loadingBuilder: (context, child, progress) =>
+                                  progress == null ? child : fallback,
+                            )
+                          : fallback,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 Text(
                   name.isEmpty ? 'Your name' : name,
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black87,
                   ),
                 ),
                 if (phone.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    phone,
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                       color: Colors.grey.shade50,
+                       borderRadius: BorderRadius.circular(20),
+                       border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Text(
+                      phone,
+                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ],
               ],

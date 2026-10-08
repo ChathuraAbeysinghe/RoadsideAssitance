@@ -1,7 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../entities/vehicle.dart';
+
+// ---------------------------------------------------------------------------
+// Validation rules (change the numbers here if your rules change)
+// ---------------------------------------------------------------------------
+const int _makeMaxLen = 15;
+const int _modelMaxLen = 15;
+const int _plateCodeMinLen = 2; // e.g. "TB"
+const int _plateCodeMaxLen = 3; // e.g. "CAB"
+const int _plateNumberLen = 4; // e.g. "5342"
+
+/// Turns everything typed into capital letters (tb -> TB).
+class _UpperCaseFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return newValue.copyWith(text: newValue.text.toUpperCase());
+  }
+}
 
 /// Form for adding a new vehicle, or editing an existing one when
 /// [vehicleToEdit] is passed. Matches the "Add Vehicle" reference design:
@@ -33,6 +54,10 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
   final _plateNumberController = TextEditingController();
 
   bool _isSaving = false;
+
+  /// Errors are shown only after the user has pressed Confirm once, then
+  /// they update live as the user fixes each field.
+  bool _submitted = false;
 
   static const _typeOrder = [
     VehicleType.car,
@@ -89,21 +114,65 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
     super.dispose();
   }
 
+  // ---------------- validation ----------------
+  /// Trims and collapses repeated spaces ("Land   Rover " -> "Land Rover").
+  String _clean(String s) => s.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+  String? get _makeError {
+    final v = _clean(_makeController.text);
+    if (v.isEmpty) return 'Make is required';
+    if (!RegExp(r'^[A-Za-z][A-Za-z \-]*$').hasMatch(v)) {
+      return 'Letters only';
+    }
+    return null;
+  }
+
+  String? get _modelError {
+    final v = _clean(_modelController.text);
+    if (v.isEmpty) return 'Model is required';
+    if (!RegExp(r'^[A-Za-z0-9][A-Za-z0-9 \-]*$').hasMatch(v)) {
+      return 'Letters and numbers only';
+    }
+    return null;
+  }
+
+  String? get _plateCodeError {
+    final v = _plateCodeController.text.trim();
+    if (v.isEmpty) return 'Plate code is required';
+    if (!RegExp('^[A-Z]{$_plateCodeMinLen,$_plateCodeMaxLen}\$').hasMatch(v)) {
+      return 'Enter $_plateCodeMinLen to $_plateCodeMaxLen letters';
+    }
+    return null;
+  }
+
+  String? get _plateNumberError {
+    final v = _plateNumberController.text.trim();
+    if (v.isEmpty) return 'Plate number is required';
+    if (!RegExp('^\\d{$_plateNumberLen}\$').hasMatch(v)) {
+      return 'Enter exactly $_plateNumberLen digits';
+    }
+    return null;
+  }
+
+  bool get _isValid =>
+      _makeError == null &&
+      _modelError == null &&
+      _plateCodeError == null &&
+      _plateNumberError == null;
+
+  /// Refreshes the error texts while the user types (after first submit).
+  void _onFieldChanged(String _) {
+    if (_submitted) setState(() {});
+  }
+
   Future<void> _onConfirm() async {
-    final make = _makeController.text.trim();
-    final model = _modelController.text.trim();
+    setState(() => _submitted = true);
+    if (!_isValid) return;
+
+    final make = _clean(_makeController.text);
+    final model = _clean(_modelController.text);
     final plateCode = _plateCodeController.text.trim();
     final plateNumber = _plateNumberController.text.trim();
-
-    if (make.isEmpty ||
-        model.isEmpty ||
-        plateCode.isEmpty ||
-        plateNumber.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all required fields')),
-      );
-      return;
-    }
 
     setState(() => _isSaving = true);
 
@@ -198,16 +267,36 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
                       ),
                     ),
                     const SizedBox(height: 14),
+                    // Make: letters only (spaces / hyphen allowed, e.g.
+                    // "Land Rover"), max 15 characters.
                     _buildLabeledField(
                       controller: _makeController,
                       label: 'Make',
                       hint: 'e.g. Toyota',
+                      errorText: _submitted ? _makeError : null,
+                      textCapitalization: TextCapitalization.words,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'[A-Za-z \-]'),
+                        ),
+                        LengthLimitingTextInputFormatter(_makeMaxLen),
+                      ],
                     ),
                     const SizedBox(height: 14),
+                    // Model: letters and numbers (spaces / hyphen allowed,
+                    // e.g. "CX-5"), max 15 characters.
                     _buildLabeledField(
                       controller: _modelController,
                       label: 'Model',
                       hint: 'e.g. Aqua',
+                      errorText: _submitted ? _modelError : null,
+                      textCapitalization: TextCapitalization.words,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'[A-Za-z0-9 \-]'),
+                        ),
+                        LengthLimitingTextInputFormatter(_modelMaxLen),
+                      ],
                     ),
                     const SizedBox(height: 28),
                     const Text(
@@ -218,17 +307,31 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
                       ),
                     ),
                     const SizedBox(height: 14),
+                    // Plate code: letters only, auto capitals, max 3.
                     _buildLabeledField(
                       controller: _plateCodeController,
                       label: 'Plate Code',
                       hint: 'e.g. TB',
+                      errorText: _submitted ? _plateCodeError : null,
+                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z]')),
+                        _UpperCaseFormatter(),
+                        LengthLimitingTextInputFormatter(_plateCodeMaxLen),
+                      ],
                     ),
                     const SizedBox(height: 14),
+                    // Plate number: digits only, max 4.
                     _buildLabeledField(
                       controller: _plateNumberController,
                       label: 'Plate Number',
                       hint: 'e.g. 5342',
                       keyboardType: TextInputType.number,
+                      errorText: _submitted ? _plateNumberError : null,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(_plateNumberLen),
+                      ],
                     ),
                     const SizedBox(height: 44),
                     SizedBox(
@@ -337,10 +440,17 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
     required String label,
     required String hint,
     TextInputType? keyboardType,
+    String? errorText,
+    List<TextInputFormatter>? inputFormatters,
+    TextCapitalization textCapitalization = TextCapitalization.none,
   }) {
+    const red = Color(0xFFE30613);
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      textCapitalization: textCapitalization,
+      onChanged: _onFieldChanged,
       decoration: InputDecoration(
         label: RichText(
           text: TextSpan(
@@ -349,13 +459,14 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
               TextSpan(text: label),
               const TextSpan(
                 text: ' *',
-                style: TextStyle(color: Color(0xFFE30613)),
+                style: TextStyle(color: red),
               ),
             ],
           ),
         ),
         hintText: hint,
         hintStyle: TextStyle(color: Colors.grey.shade400),
+        errorText: errorText,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: Colors.grey.shade300),
@@ -367,6 +478,14 @@ class _AddVehiclePageState extends State<AddVehiclePage> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Colors.black, width: 1.6),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: red),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: red, width: 1.6),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,

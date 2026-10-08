@@ -244,4 +244,8 @@ class ProviderRepository {
     }
     await batch.commit();
   }
+
+  Future<void> deleteNotification(String id) async {
+    await _firestore.collection('notifications').doc(id).delete();
+  }
 }
