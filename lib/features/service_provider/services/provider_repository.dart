@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../entities/app_user.dart';
 import '../../../entities/service_request.dart';
 import '../models/provider_service.dart';
+import '../models/provider_station.dart';
 
 /// A notification document in the top-level `notifications` collection:
 /// { uid, title, body, type, requestId?, read, createdAt }
@@ -247,5 +248,36 @@ class ProviderRepository {
 
   Future<void> deleteNotification(String id) async {
     await _firestore.collection('notifications').doc(id).delete();
+  }
+
+  // ------------------------------------------------------------------
+  // Service Station listings (providerStations)
+  // ------------------------------------------------------------------
+
+  Stream<List<ProviderStation>> watchStations(String uid) {
+    return _firestore
+        .collection('providerStations')
+        .where('providerUid', isEqualTo: uid)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => ProviderStation.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  Future<void> addStation(ProviderStation station) async {
+    await _firestore.collection('providerStations').add(station.toMap());
+  }
+
+  Future<void> updateStation(ProviderStation station) async {
+    await _firestore
+        .collection('providerStations')
+        .doc(station.id)
+        .update(station.toMap());
+  }
+
+  Future<void> deleteStation(String stationId) async {
+    await _firestore.collection('providerStations').doc(stationId).delete();
   }
 }
