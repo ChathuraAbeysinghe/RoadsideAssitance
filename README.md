@@ -166,14 +166,6 @@ Moderated usability evaluations were conducted with 5 representative target part
 
 ---
 
-## 👥 Group WD_23 Contribution & Workload Distribution
-
-| Student ID | Student Name | Assigned Core Modules & Implementation Scope |
-|:---|:---|:---|
-| **IT23829206** | **Abeysinghe A M C P** | **Complete Service Provider Module:** Provider Home Dashboard, Two-Tab Service Management (`Services` & `Service Stations`), Incoming Request Detail & Radar, Provider Job Details Workspace, Job History (My Jobs), Provider Notifications, Settings & Animated Navigation. |
-| **IT23833166** | **Thennakoon T M T P B** | Driver Home layout, Service Provider Details Screen, and Usability Testing execution. |
-| **IT23838802** | **Wimalasingha T K P** | Driver Home integration, Fault-specific Service Request Forms, and Request Summary / Confirmation. |
-| **IT23823716** | **Lakshan J M P** | Welcome flow, Phone OTP Authentication, Complete Profile, and Find Service Provider listing. |
 
 ---
 
