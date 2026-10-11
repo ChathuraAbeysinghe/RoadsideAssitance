@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +8,7 @@ import '../../entities/app_user.dart';
 import '../_share/navbar/app_bottom_nav_bar.dart';
 import '../nearby_centers/service_centers_near_location_page.dart';
 import '../profile/profile_page.dart';
-import '../request_service/service_location_page.dart';
+import '../request_service/request_service.dart';
 
 class HomePage extends StatefulWidget {
   final UserType userType;
@@ -25,16 +23,10 @@ class _HomePageState extends State<HomePage> {
   // Set to false if hero.png already contains the "24/7 Roadside Assistance" text.
   static const bool _showHeroText = true;
 
-  // Add / remove image paths here — the carousel adapts to however many you put.
-  final List<String> _heroImages = const [
-    'assets/images/fuelstation.jpg',
-    'assets/images/autoshop.jpg',
-  ];
+  // Single static image for the "Explore Nearby Services" card.
+  static const String _exploreImage = 'assets/images/fuelstation.jpg';
 
-  late final PageController _heroController;
   late Future<AppUser?> _userFuture;
-  Timer? _heroTimer;
-  int _currentHeroPage = 0;
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -47,8 +39,6 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _userFuture = _loadCurrentUser();
-    _heroController = PageController(initialPage: 0);
-    _startHeroTimer();
   }
 
   Future<AppUser?> _loadCurrentUser() async {
@@ -64,29 +54,16 @@ class _HomePageState extends State<HomePage> {
     return userFromMap(uid, data);
   }
 
-  void _startHeroTimer() {
-    _heroTimer?.cancel();
-    _heroTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (!mounted || !_heroController.hasClients) return;
-      _currentHeroPage = (_currentHeroPage + 1) % _heroImages.length;
-      _heroController.animateToPage(
-        _currentHeroPage,
-        duration: const Duration(milliseconds: 10),
-        curve: Curves.easeInOut,
-      );
-    });
-  }
-
   void _openService(ServiceType type) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) =>
-            ServiceLocationPage(serviceType: type, userType: widget.userType),
+            RequestServicePage(serviceType: type, userType: widget.userType),
       ),
     );
   }
 
-  /// Carousel tap: get the phone's GPS location (fallback: Colombo)
+  /// Explore card tap: get the phone's GPS location (fallback: Colombo)
   /// and open the nearby service centers list.
   Future<void> _openNearbyCenters() async {
     LatLng location = const LatLng(6.9271, 79.8612); // Colombo fallback
@@ -123,21 +100,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openProfile() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const ProfilePage()));
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ProfilePage()));
     // Refresh the header so a changed name shows up when you come back.
     if (!mounted) return;
     setState(() {
       _userFuture = _loadCurrentUser();
     });
-  }
-
-  @override
-  void dispose() {
-    _heroTimer?.cancel();
-    _heroController.dispose();
-    super.dispose();
   }
 
   Widget _buildHeader() {
@@ -394,8 +363,9 @@ class _HomePageState extends State<HomePage> {
                                           label: 'Vehicle Tow',
                                           imagePath: 'assets/images/towing.png',
                                           height: 110,
-                                          onTap: () =>
-                                              _openService(ServiceType.towTruck),
+                                          onTap: () => _openService(
+                                            ServiceType.towTruck,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 14),
@@ -405,8 +375,9 @@ class _HomePageState extends State<HomePage> {
                                           imagePath:
                                               'assets/images/mechanic.png',
                                           height: 110,
-                                          onTap: () =>
-                                              _openService(ServiceType.mechanic),
+                                          onTap: () => _openService(
+                                            ServiceType.mechanic,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -466,7 +437,7 @@ class _HomePageState extends State<HomePage> {
                                   children: [
                                     SizedBox(height: 6),
                                     Text(
-                                      'Explore Nearby',
+                                      'Explore Nearby Services',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 18,
@@ -479,7 +450,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                             const SizedBox(height: 20),
 
-                            // Auto-rotating carousel (tap -> nearby service centers)
+                            // Single static image (tap -> nearby service centers)
                             Padding(
                               padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                               child: Container(
@@ -503,25 +474,16 @@ class _HomePageState extends State<HomePage> {
                                     child: SizedBox(
                                       height: 210,
                                       width: double.infinity,
-                                      child: PageView.builder(
-                                        controller: _heroController,
-                                        itemCount: _heroImages.length,
-                                        onPageChanged: (index) {
-                                          _currentHeroPage = index;
-                                        },
-                                        itemBuilder: (context, index) {
-                                          return Image.asset(
-                                            _heroImages[index],
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) =>
-                                                    Container(
-                                                      color: const Color(
-                                                        0xFFE30613,
-                                                      ),
-                                                    ),
-                                          );
-                                        },
+                                      child: Image.asset(
+                                        _exploreImage,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Container(
+                                                  color: const Color(
+                                                    0xFFE30613,
+                                                  ),
+                                                ),
                                       ),
                                     ),
                                   ),
