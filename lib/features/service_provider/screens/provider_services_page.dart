@@ -1,5 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../entities/app_user.dart';
 import '../../_share/navbar/app_bottom_nav_bar.dart';
@@ -43,7 +48,8 @@ class ProviderServicesPage extends StatelessWidget {
             ],
           ),
         ),
-        bottomNavigationBar: AppBottomNavBar(userType: userType, activeIndex: 2),
+        bottomNavigationBar:
+            AppBottomNavBar(userType: userType, activeIndex: 2),
       ),
     );
   }
@@ -100,7 +106,9 @@ class ProviderServicesPage extends StatelessWidget {
           return const _Message(message: 'Unable to load services.');
         }
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFFE30613)));
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFFE30613)),
+          );
         }
         final services = snapshot.data!;
         if (services.isEmpty) {
@@ -128,7 +136,9 @@ class ProviderServicesPage extends StatelessWidget {
           return const _Message(message: 'Unable to load service stations.');
         }
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFFE30613)));
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFFE30613)),
+          );
         }
         final stations = snapshot.data!;
         if (stations.isEmpty) {
@@ -142,10 +152,16 @@ class ProviderServicesPage extends StatelessWidget {
           children: [
             _buildStationSectionHeader(stations.length),
             const SizedBox(height: 16),
-            ...stations.map((station) => _StationCard(
-              station: station,
-              onEdit: () => _openAddStationSheet(context, _resolvedUid, existingStation: station),
-            )),
+            ...stations.map(
+              (station) => _StationCard(
+                station: station,
+                onEdit: () => _openAddStationSheet(
+                  context,
+                  _resolvedUid,
+                  existingStation: station,
+                ),
+              ),
+            ),
             const SizedBox(height: 8),
             _AddStationCard(
               onTap: () => _openAddStationSheet(context, _resolvedUid),
@@ -190,12 +206,17 @@ class ProviderServicesPage extends StatelessWidget {
     );
   }
 
-  void _openAddStationSheet(BuildContext context, String uid, {ProviderStation? existingStation}) {
+  void _openAddStationSheet(
+    BuildContext context,
+    String uid, {
+    ProviderStation? existingStation,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _StationFormSheet(uid: uid, existingStation: existingStation),
+      builder: (_) =>
+          _StationFormSheet(uid: uid, existingStation: existingStation),
     );
   }
 
@@ -243,7 +264,6 @@ class ProviderServicesPage extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Back button aligned left
           Align(
             alignment: Alignment.centerLeft,
             child: Container(
@@ -255,12 +275,15 @@ class ProviderServicesPage extends StatelessWidget {
               ),
               child: IconButton(
                 onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.chevron_left, color: Colors.black87, size: 24),
+                icon: const Icon(
+                  Icons.chevron_left,
+                  color: Colors.black87,
+                  size: 24,
+                ),
                 padding: EdgeInsets.zero,
               ),
             ),
           ),
-          // Centered title + subtitle
           const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -315,7 +338,11 @@ class _EmptyServices extends StatelessWidget {
           const Text(
             'Your services will appear here',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
@@ -396,7 +423,6 @@ class _ServiceCard extends StatelessWidget {
             child: IntrinsicHeight(
               child: Row(
                 children: [
-                  // Red left accent border
                   Container(
                     width: 4,
                     decoration: BoxDecoration(
@@ -409,9 +435,11 @@ class _ServiceCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Service icon
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 18,
+                    ),
                     child: SizedBox(
                       width: 44,
                       height: 44,
@@ -421,7 +449,6 @@ class _ServiceCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Service info
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 18),
@@ -433,11 +460,15 @@ class _ServiceCard extends StatelessWidget {
                             children: [
                               Flexible(
                                 child: Text(
-                                  service.name.isEmpty ? service.displayType : service.name,
+                                  service.name.isEmpty
+                                      ? service.displayType
+                                      : service.name,
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color: service.isActive ? Colors.black87 : Colors.grey.shade600,
+                                    color: service.isActive
+                                        ? Colors.black87
+                                        : Colors.grey.shade600,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -446,15 +477,24 @@ class _ServiceCard extends StatelessWidget {
                               if (!service.isActive) ...[
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.orange.shade50,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.orange.shade200),
+                                    border: Border.all(
+                                      color: Colors.orange.shade200,
+                                    ),
                                   ),
                                   child: const Text(
                                     'Paused',
-                                    style: TextStyle(fontSize: 10, color: Colors.deepOrange, fontWeight: FontWeight.w700),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.deepOrange,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -475,10 +515,14 @@ class _ServiceCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // More menu
                   PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert_rounded, color: Colors.grey.shade600),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      color: Colors.grey.shade600,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     position: PopupMenuPosition.under,
                     onSelected: (value) async {
                       if (value == 'edit') {
@@ -504,7 +548,11 @@ class _ServiceCard extends StatelessWidget {
                         value: 'edit',
                         child: Row(
                           children: [
-                            Icon(Icons.edit_outlined, size: 20, color: Colors.grey.shade700),
+                            Icon(
+                              Icons.edit_outlined,
+                              size: 20,
+                              color: Colors.grey.shade700,
+                            ),
                             const SizedBox(width: 12),
                             const Text('Edit service'),
                           ],
@@ -514,9 +562,19 @@ class _ServiceCard extends StatelessWidget {
                         value: 'toggle',
                         child: Row(
                           children: [
-                            Icon(service.isActive ? Icons.pause_circle_outline : Icons.play_circle_outline, size: 20, color: Colors.grey.shade700),
+                            Icon(
+                              service.isActive
+                                  ? Icons.pause_circle_outline
+                                  : Icons.play_circle_outline,
+                              size: 20,
+                              color: Colors.grey.shade700,
+                            ),
                             const SizedBox(width: 12),
-                            Text(service.isActive ? 'Pause service' : 'Restart service'),
+                            Text(
+                              service.isActive
+                                  ? 'Pause service'
+                                  : 'Restart service',
+                            ),
                           ],
                         ),
                       ),
@@ -524,9 +582,16 @@ class _ServiceCard extends StatelessWidget {
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                            Icon(
+                              Icons.delete_outline,
+                              size: 20,
+                              color: Colors.red,
+                            ),
                             SizedBox(width: 12),
-                            Text('Remove service', style: TextStyle(color: Colors.red)),
+                            Text(
+                              'Remove service',
+                              style: TextStyle(color: Colors.red),
+                            ),
                           ],
                         ),
                       ),
@@ -541,9 +606,6 @@ class _ServiceCard extends StatelessWidget {
     );
   }
 
-  /// Returns the correct icon asset path based on the service type.
-  /// For tow trucks, differentiates between Wheel Lift and Flat Bed
-  /// based on the vehicleTypes field.
   String _getIconAssetPath(ProviderService service) {
     switch (service.serviceType) {
       case ServiceType.towTruck:
@@ -578,14 +640,10 @@ class _AddServiceCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: const Color(0xFFE30613),
-            width: 1.5,
-          ),
+          border: Border.all(color: const Color(0xFFE30613), width: 1.5),
         ),
         child: Row(
           children: [
-            // Red circle with + icon
             Container(
               width: 44,
               height: 44,
@@ -593,14 +651,9 @@ class _AddServiceCard extends StatelessWidget {
                 color: Color(0xFFE30613),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 24,
-              ),
+              child: const Icon(Icons.add, color: Colors.white, size: 24),
             ),
             const SizedBox(width: 14),
-            // Text content
             const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,12 +678,7 @@ class _AddServiceCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Chevron right
-            Icon(
-              Icons.chevron_right,
-              color: Colors.grey.shade400,
-              size: 28,
-            ),
+            Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 28),
           ],
         ),
       ),
@@ -642,7 +690,9 @@ class _Message extends StatelessWidget {
   final String message;
   const _Message({required this.message});
   @override
-  Widget build(BuildContext context) => Center(child: Text(message, style: const TextStyle(color: Colors.grey)));
+  Widget build(BuildContext context) => Center(
+        child: Text(message, style: const TextStyle(color: Colors.grey)),
+      );
 }
 
 void _openAdd(BuildContext context, String uid) {
@@ -681,11 +731,15 @@ class _EmptyStations extends StatelessWidget {
           const Text(
             'Your service stations will appear here',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
-            'You haven\'t added any service stations yet. Add your garage, repair shop, or service center to manage it here.',
+            'You haven\'t added any service stations yet. Add your garage, repair shop, or service center so nearby drivers can find it.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,
@@ -728,10 +782,7 @@ class _StationCard extends StatelessWidget {
   final ProviderStation station;
   final VoidCallback onEdit;
 
-  const _StationCard({
-    required this.station,
-    required this.onEdit,
-  });
+  const _StationCard({required this.station, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -770,7 +821,10 @@ class _StationCard extends StatelessWidget {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 18,
+                    ),
                     child: Container(
                       width: 46,
                       height: 46,
@@ -804,7 +858,9 @@ class _StationCard extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color: station.isActive ? Colors.black87 : Colors.grey.shade600,
+                                    color: station.isActive
+                                        ? Colors.black87
+                                        : Colors.grey.shade600,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -813,15 +869,24 @@ class _StationCard extends StatelessWidget {
                               if (!station.isActive) ...[
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.orange.shade50,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.orange.shade200),
+                                    border: Border.all(
+                                      color: Colors.orange.shade200,
+                                    ),
                                   ),
                                   child: const Text(
                                     'Paused',
-                                    style: TextStyle(fontSize: 10, color: Colors.deepOrange, fontWeight: FontWeight.w700),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.deepOrange,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -840,12 +905,19 @@ class _StationCard extends StatelessWidget {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade500),
+                                Icon(
+                                  Icons.location_on_outlined,
+                                  size: 14,
+                                  color: Colors.grey.shade500,
+                                ),
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
                                     station.address,
-                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -853,17 +925,33 @@ class _StationCard extends StatelessWidget {
                               ],
                             ),
                           ],
-                          if (station.operatingHours.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Icon(Icons.access_time_rounded, size: 14, color: Colors.grey.shade500),
-                                const SizedBox(width: 4),
-                                Text(
-                                  station.operatingHours,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.access_time_rounded,
+                                size: 14,
+                                color: Colors.grey.shade500,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                station.operatingHours,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
                                 ),
-                              ],
+                              ),
+                            ],
+                          ),
+                          if (!station.hasLocation) ...[
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Location not set. Edit to appear for drivers.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.deepOrange,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ],
@@ -871,8 +959,13 @@ class _StationCard extends StatelessWidget {
                     ),
                   ),
                   PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert_rounded, color: Colors.grey.shade600),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      color: Colors.grey.shade600,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     position: PopupMenuPosition.under,
                     onSelected: (value) async {
                       if (value == 'edit') {
@@ -890,7 +983,11 @@ class _StationCard extends StatelessWidget {
                         value: 'edit',
                         child: Row(
                           children: [
-                            Icon(Icons.edit_outlined, size: 20, color: Colors.grey.shade700),
+                            Icon(
+                              Icons.edit_outlined,
+                              size: 20,
+                              color: Colors.grey.shade700,
+                            ),
                             const SizedBox(width: 12),
                             const Text('Edit station'),
                           ],
@@ -901,12 +998,18 @@ class _StationCard extends StatelessWidget {
                         child: Row(
                           children: [
                             Icon(
-                              station.isActive ? Icons.pause_circle_outline : Icons.play_circle_outline,
+                              station.isActive
+                                  ? Icons.pause_circle_outline
+                                  : Icons.play_circle_outline,
                               size: 20,
                               color: Colors.grey.shade700,
                             ),
                             const SizedBox(width: 12),
-                            Text(station.isActive ? 'Pause station' : 'Restart station'),
+                            Text(
+                              station.isActive
+                                  ? 'Pause station'
+                                  : 'Restart station',
+                            ),
                           ],
                         ),
                       ),
@@ -914,9 +1017,16 @@ class _StationCard extends StatelessWidget {
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                            Icon(
+                              Icons.delete_outline,
+                              size: 20,
+                              color: Colors.red,
+                            ),
                             SizedBox(width: 12),
-                            Text('Remove station', style: TextStyle(color: Colors.red)),
+                            Text(
+                              'Remove station',
+                              style: TextStyle(color: Colors.red),
+                            ),
                           ],
                         ),
                       ),
@@ -960,10 +1070,7 @@ class _AddStationCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: const Color(0xFFE30613),
-            width: 1.5,
-          ),
+          border: Border.all(color: const Color(0xFFE30613), width: 1.5),
         ),
         child: Row(
           children: [
@@ -974,11 +1081,7 @@ class _AddStationCard extends StatelessWidget {
                 color: Color(0xFFE30613),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 24,
-              ),
+              child: const Icon(Icons.add, color: Colors.white, size: 24),
             ),
             const SizedBox(width: 14),
             const Expanded(
@@ -1005,11 +1108,7 @@ class _AddStationCard extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.grey.shade400,
-              size: 28,
-            ),
+            Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 28),
           ],
         ),
       ),
@@ -1017,6 +1116,9 @@ class _AddStationCard extends StatelessWidget {
   }
 }
 
+// -----------------------------------------------
+// Add / edit station form
+// -----------------------------------------------
 class _StationFormSheet extends StatefulWidget {
   final String uid;
   final ProviderStation? existingStation;
@@ -1028,21 +1130,46 @@ class _StationFormSheet extends StatefulWidget {
 }
 
 class _StationFormSheetState extends State<_StationFormSheet> {
+  static const Color _red = Color(0xFFE30613);
+  static const LatLng _fallback = LatLng(6.9271, 79.8612);
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _addressController;
   late final TextEditingController _phoneController;
-  late final TextEditingController _hoursController;
-  late final TextEditingController _servicesController;
+  late final TextEditingController _priceController;
+  final MapController _map = MapController();
+
   late String _selectedType;
+  LatLng? _point;
+  bool _is24h = false;
+  int _open = 8;
+  int _close = 18;
+  bool _accepting = true;
   bool _saving = false;
+  bool _locating = false;
+  bool _mapExpanded = false;
+  bool _submitted = false; // show inline errors after first Save tap
+  Set<String> _selectedServices = {};
 
   final List<String> _stationTypes = const [
-    'Auto Repair & Garage',
     'Service Station & Wash',
-    'Fuel Station',
-    'Tire & Battery Hub',
-    'Multi-Service Center',
+    'Only Body Wash',
+    'Engine oil Change',
+    'Multi service',
+  ];
+
+  final List<String> _availableServices = const [
+    'Full Inspection',
+    'Oil Change',
+    'Tire Replacement',
+    'Battery Service',
+    'Car Wash',
+    'Engine Repair',
+    'Brake Service',
+    'Air Filter Change',
+    'Coolant Flush',
+    'Transmission Repair',
   ];
 
   @override
@@ -1052,9 +1179,25 @@ class _StationFormSheetState extends State<_StationFormSheet> {
     _nameController = TextEditingController(text: s?.name ?? '');
     _addressController = TextEditingController(text: s?.address ?? '');
     _phoneController = TextEditingController(text: s?.phone ?? '');
-    _hoursController = TextEditingController(text: s?.operatingHours ?? '08:00 AM - 08:00 PM');
-    _servicesController = TextEditingController(text: s?.services.join(', ') ?? 'Full Inspection, Oil Change, Repairs');
-    _selectedType = s?.stationType ?? _stationTypes.first;
+    _priceController = TextEditingController(
+      text: (s != null && s.fullServicePrice > 0)
+          ? s.fullServicePrice.toStringAsFixed(0)
+          : '',
+    );
+    // Ensure the selected type exists in the new list
+    final stationType = s?.stationType ?? _stationTypes.first;
+    _selectedType =
+        _stationTypes.contains(stationType) ? stationType : _stationTypes.first;
+    _selectedServices = s?.services.toSet() ?? {};
+    if (s != null) {
+      if (s.hasLocation) _point = LatLng(s.latitude, s.longitude);
+      _is24h = s.is24h;
+      if (!_is24h) {
+        _open = s.openHour.clamp(0, 23);
+        _close = s.closeHour.clamp(1, 24);
+      }
+      _accepting = !s.manuallyClosed;
+    }
   }
 
   @override
@@ -1062,22 +1205,142 @@ class _StationFormSheetState extends State<_StationFormSheet> {
     _nameController.dispose();
     _addressController.dispose();
     _phoneController.dispose();
-    _hoursController.dispose();
-    _servicesController.dispose();
+    _priceController.dispose();
+    _map.dispose();
     super.dispose();
   }
 
+  void _toast(String m, {Color? color}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(m), backgroundColor: color));
+  }
+
+  void _moveMap(LatLng p) {
+    try {
+      _map.move(p, 16);
+    } catch (_) {}
+  }
+
+  Future<String> _addressOf(LatLng p) async {
+    try {
+      final list = await placemarkFromCoordinates(p.latitude, p.longitude);
+      if (list.isNotEmpty) {
+        final m = list.first;
+        final parts = <String>[
+          m.name ?? '',
+          m.street ?? '',
+          m.subLocality ?? '',
+          m.locality ?? '',
+        ].where((s) => s.trim().isNotEmpty).toSet().toList();
+        if (parts.isNotEmpty) return parts.join(', ');
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  Future<void> _useCurrentLocation() async {
+    setState(() => _locating = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _toast('Please turn on location services.');
+        return;
+      }
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        _toast('Location permission is required.');
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      ).timeout(const Duration(seconds: 12));
+      final p = LatLng(pos.latitude, pos.longitude);
+      setState(() => _point = p);
+      _moveMap(p);
+      final a = await _addressOf(p);
+      if (mounted && a.isNotEmpty) _addressController.text = a;
+    } catch (_) {
+      _toast('Could not get your current location.');
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  Future<void> _findAddressOnMap() async {
+    final q = _addressController.text.trim();
+    if (q.isEmpty) {
+      _toast('Type the address first.');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    try {
+      final res = await locationFromAddress(q);
+      if (res.isEmpty) {
+        _toast('Address not found. Try a more specific address.');
+        return;
+      }
+      final p = LatLng(res.first.latitude, res.first.longitude);
+      setState(() => _point = p);
+      _moveMap(p);
+    } catch (_) {
+      _toast('Address not found. Try a more specific address.');
+    }
+  }
+
+  Future<void> _onMapTap(LatLng p) async {
+    setState(() => _point = p);
+    final a = await _addressOf(p);
+    if (mounted && a.isNotEmpty) _addressController.text = a;
+  }
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitted = true);
+
+    final formOk = _formKey.currentState!.validate();
+    final servicesOk = _selectedServices.isNotEmpty;
+    final pinOk = _point != null;
+
+    if (!formOk || !servicesOk || !pinOk) {
+      _toast('Please fill in all required fields.');
+      return;
+    }
+    if (!_is24h && _open >= _close) {
+      _toast('Closing time must be after opening time.');
+      return;
+    }
+
+    final price = double.parse(_priceController.text.trim());
+
     setState(() => _saving = true);
 
-    final serviceList = _servicesController.text
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
     try {
+      LatLng? p = _point;
+      if (p == null) {
+        try {
+          final res = await locationFromAddress(_addressController.text.trim());
+          if (res.isNotEmpty) {
+            p = LatLng(res.first.latitude, res.first.longitude);
+          }
+        } catch (_) {}
+      }
+      if (p == null) {
+        _toast(
+          'Set the location: tap the map, use current location, or find the address.',
+        );
+        if (mounted) setState(() => _saving = false);
+        return;
+      }
+
+      final serviceList = _selectedServices.toList();
+      final openHour = _is24h ? 0 : _open;
+      final closeHour = _is24h ? 24 : _close;
+
       if (widget.existingStation != null) {
         await ProviderRepository().updateStation(
           widget.existingStation!.copyWith(
@@ -1085,7 +1348,12 @@ class _StationFormSheetState extends State<_StationFormSheet> {
             stationType: _selectedType,
             address: _addressController.text.trim(),
             phone: _phoneController.text.trim(),
-            operatingHours: _hoursController.text.trim(),
+            latitude: p.latitude,
+            longitude: p.longitude,
+            fullServicePrice: price,
+            openHour: openHour,
+            closeHour: closeHour,
+            manuallyClosed: !_accepting,
             services: serviceList,
           ),
         );
@@ -1098,8 +1366,16 @@ class _StationFormSheetState extends State<_StationFormSheet> {
             stationType: _selectedType,
             address: _addressController.text.trim(),
             phone: _phoneController.text.trim(),
-            operatingHours: _hoursController.text.trim(),
+            latitude: p.latitude,
+            longitude: p.longitude,
+            fullServicePrice: price,
+            openHour: openHour,
+            closeHour: closeHour,
+            manuallyClosed: !_accepting,
             services: serviceList,
+            isActive: true,
+            rating: 5.0,
+            reviewCount: 0,
           ),
         );
       }
@@ -1119,14 +1395,63 @@ class _StationFormSheetState extends State<_StationFormSheet> {
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save: $e'),
-            backgroundColor: const Color(0xFFE30613),
-          ),
-        );
+        _toast('Failed to save: $e', color: _red);
       }
     }
+  }
+
+  InputDecoration _dec(String hint, {IconData? icon}) => InputDecoration(
+        hintText: hint,
+        prefixIcon: icon == null ? null : Icon(icon, size: 20),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: _red),
+        ),
+      );
+
+  Widget _label(String t, {bool required = true}) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text.rich(
+          TextSpan(
+            text: t,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            children: [
+              if (required)
+                const TextSpan(text: ' *', style: TextStyle(color: _red)),
+            ],
+          ),
+        ),
+      );
+
+  Widget _hourDropdown(
+    String label,
+    int value,
+    List<int> options,
+    ValueChanged<int> onChanged,
+  ) {
+    return DropdownButtonFormField<int>(
+      initialValue: value,
+      decoration: InputDecoration(
+        labelText: label,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      items: options
+          .map(
+            (h) => DropdownMenuItem(
+              value: h,
+              child: Text(ProviderStation.hourLabel(h)),
+            ),
+          )
+          .toList(),
+      onChanged: (v) {
+        if (v != null) onChanged(v);
+      },
+    );
   }
 
   @override
@@ -1178,22 +1503,50 @@ class _StationFormSheetState extends State<_StationFormSheet> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Station Category',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
                 const SizedBox(height: 8),
+
+                // Open / Closed quick switch
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (_accepting ? const Color(0xFF1E9E4A) : _red)
+                        .withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _accepting
+                              ? 'Open for customers (during working hours)'
+                              : 'Marked as Closed',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: _accepting
+                                ? const Color(0xFF1E9E4A)
+                                : _red,
+                          ),
+                        ),
+                      ),
+                      Switch(
+                        value: _accepting,
+                        activeThumbColor: const Color(0xFF1E9E4A),
+                        onChanged: (v) => setState(() => _accepting = v),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                _label('Station Category'),
                 DropdownButtonFormField<String>(
                   initialValue: _selectedType,
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE30613)),
-                    ),
-                  ),
+                  decoration: _dec(''),
+                  validator: (v) => (v == null || v.isEmpty)
+                      ? 'Please select a station category'
+                      : null,
                   items: _stationTypes
                       .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                       .toList(),
@@ -1202,122 +1555,288 @@ class _StationFormSheetState extends State<_StationFormSheet> {
                   },
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  'Station Name',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
+
+                _label('Station Name'),
                 TextFormField(
                   controller: _nameController,
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Please enter station name' : null,
-                  decoration: InputDecoration(
-                    hintText: 'e.g., Apex Auto Care & Garage',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE30613)),
-                    ),
-                  ),
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Please enter station name'
+                      : null,
+                  decoration: _dec('e.g., Apex Auto Care & Garage'),
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  'Address / Location',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _addressController,
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Please enter address' : null,
-                  decoration: InputDecoration(
-                    hintText: 'e.g., Kandy Road, Malabe',
-                    prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE30613)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                const Text(
-                  'Contact Phone',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
+
+                _label('Contact Phone'),
                 TextFormField(
                   controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Please enter contact number' : null,
-                  decoration: InputDecoration(
-                    hintText: 'e.g., 0112345678',
-                    prefixIcon: const Icon(Icons.phone_outlined, size: 20),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE30613)),
+                  keyboardType: TextInputType.number,
+                  maxLength: 10,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Please enter contact number';
+                    }
+                    final digits = v.trim().replaceAll(RegExp(r'\D'), '');
+                    if (digits.length != 10) {
+                      return 'Phone number must be exactly 10 digits';
+                    }
+                    return null;
+                  },
+                  decoration: _dec(
+                    'e.g., 0112345678',
+                    icon: Icons.phone_outlined,
+                  ).copyWith(counterText: ''),
+                ),
+                const SizedBox(height: 14),
+
+                _label('Full Service Price (LKR)'),
+                TextFormField(
+                  controller: _priceController,
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Please enter the price';
+                    }
+                    final value = double.tryParse(v.trim());
+                    if (value == null || value <= 0) {
+                      return 'Price must be greater than 0';
+                    }
+                    return null;
+                  },
+                  decoration:
+                      _dec('e.g., 12500', icon: Icons.payments_outlined),
+                ),
+                const SizedBox(height: 14),
+
+                _label('Address / Location'),
+                TextFormField(
+                  controller: _addressController,
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Please enter address'
+                      : null,
+                  decoration: _dec(
+                    'e.g., Kandy Road, Malabe',
+                    icon: Icons.location_on_outlined,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _findAddressOnMap,
+                        icon: const Icon(Icons.search, size: 18),
+                        label: const Text(
+                          'Find on map',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
                     ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _locating ? null : _useCurrentLocation,
+                        icon: _locating
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.my_location, size: 18),
+                        label: const Text(
+                          'Use current',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    height: _mapExpanded ? 300 : 170,
+                    child: Stack(
+                      children: [
+                        FlutterMap(
+                          mapController: _map,
+                          options: MapOptions(
+                            initialCenter: _point ?? _fallback,
+                            initialZoom: _point == null ? 11 : 16,
+                            onTap: (_, p) => _onMapTap(p),
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate:
+                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName:
+                                  'com.example.roadside_assitance',
+                            ),
+                            if (_point != null)
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: _point!,
+                                    width: 44,
+                                    height: 44,
+                                    alignment: Alignment.topCenter,
+                                    child: const Icon(
+                                      Icons.location_on,
+                                      size: 44,
+                                      color: _red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: FloatingActionButton.small(
+                            backgroundColor: Colors.white,
+                            foregroundColor: _red,
+                            onPressed: () =>
+                                setState(() => _mapExpanded = !_mapExpanded),
+                            child: Icon(
+                              _mapExpanded
+                                  ? Icons.fullscreen_exit
+                                  : Icons.fullscreen,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _point == null
+                      ? (_submitted
+                          ? 'Please select a location on the map'
+                          : 'Tap the map to drop a pin on your exact shop location.')
+                      : 'Pin set. Tap the map to move it.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: (_submitted && _point == null)
+                        ? _red
+                        : Colors.grey.shade600,
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  'Operating Hours',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+
+                _label('Working Hours', required: false),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  activeThumbColor: _red,
+                  title: const Text('Open 24 hours'),
+                  value: _is24h,
+                  onChanged: (v) => setState(() => _is24h = v),
                 ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _hoursController,
-                  decoration: InputDecoration(
-                    hintText: 'e.g., 08:00 AM - 08:00 PM or 24 Hours',
-                    prefixIcon: const Icon(Icons.access_time, size: 20),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE30613)),
-                    ),
+                if (!_is24h)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _hourDropdown(
+                          'Opens',
+                          _open,
+                          List.generate(24, (i) => i),
+                          (v) => setState(() => _open = v),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _hourDropdown(
+                          'Closes',
+                          _close,
+                          List.generate(24, (i) => i + 1),
+                          (v) => setState(() => _close = v),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
                 const SizedBox(height: 14),
-                const Text(
-                  'Services Offered (comma separated)',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _servicesController,
-                  decoration: InputDecoration(
-                    hintText: 'e.g., Engine Diagnostics, Oil Change, Car Wash',
-                    prefixIcon: const Icon(Icons.build_outlined, size: 20),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE30613)),
+
+                _label('Services Offered'),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: (_submitted && _selectedServices.isEmpty)
+                          ? _red
+                          : Colors.grey.shade300,
                     ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < _availableServices.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 8),
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text(
+                            _availableServices[i],
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          value:
+                              _selectedServices.contains(_availableServices[i]),
+                          onChanged: (val) {
+                            setState(() {
+                              if (val == true) {
+                                _selectedServices.add(_availableServices[i]);
+                              } else {
+                                _selectedServices.remove(_availableServices[i]);
+                              }
+                            });
+                          },
+                        ),
+                      ],
+                    ],
                   ),
                 ),
+                if (_submitted && _selectedServices.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6, left: 4),
+                    child: Text(
+                      'Please select at least one service',
+                      style: TextStyle(fontSize: 12, color: _red),
+                    ),
+                  ),
                 const SizedBox(height: 24),
+
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
                     onPressed: _saving ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE30613),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      backgroundColor: _red,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     child: _saving
                         ? const SizedBox(
                             width: 24,
                             height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
                           )
                         : Text(
-                            widget.existingStation != null ? 'Update Station' : 'Save Station',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                            widget.existingStation != null
+                                ? 'Update Station'
+                                : 'Save Station',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                   ),
                 ),
