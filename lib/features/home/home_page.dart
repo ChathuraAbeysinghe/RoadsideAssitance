@@ -24,7 +24,7 @@ class _HomePageState extends State<HomePage> {
   static const bool _showHeroText = true;
 
   // Single static image for the "Explore Nearby Services" card.
-  static const String _exploreImage = 'assets/images/fuelstation.jpg';
+  static const String _exploreImage = 'assets/images/nearby-services.jpg';
 
   late Future<AppUser?> _userFuture;
 
