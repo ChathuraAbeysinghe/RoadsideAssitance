@@ -73,9 +73,10 @@ class _ProviderHomePageState extends State<ProviderHomePage> {
 
   String get _greeting {
     final h = DateTime.now().hour;
-    if (h < 12) return 'Good Morning';
-    if (h < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (h >= 5 && h < 12) return 'Good morning';
+    if (h >= 12 && h < 17) return 'Good afternoon';
+    if (h >= 17 && h < 21) return 'Good evening';
+    return 'Good night';
   }
 
   Future<void> _setAvailable(bool value) async {
