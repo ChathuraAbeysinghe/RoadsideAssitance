@@ -9,6 +9,7 @@ import '../_share/navbar/app_bottom_nav_bar.dart';
 import '../nearby_centers/service_centers_near_location_page.dart';
 import '../profile/profile_page.dart';
 import '../request_service/request_service.dart';
+import '../ai_assistant/screens/ai_fault_assistant_page.dart';
 
 class HomePage extends StatefulWidget {
   final UserType userType;
@@ -59,6 +60,14 @@ class _HomePageState extends State<HomePage> {
       MaterialPageRoute(
         builder: (_) =>
             RequestServicePage(serviceType: type, userType: widget.userType),
+      ),
+    );
+  }
+
+  void _openAiAssistant() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AiFaultAssistantPage(userType: widget.userType),
       ),
     );
   }
@@ -316,32 +325,140 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             Padding(
                               padding: const EdgeInsets.fromLTRB(20, 25, 20, 0),
-                              child: Container(
-                                height: 52,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(30),
-                                  border: Border.all(
-                                    color: Colors.grey.shade300,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(30),
+                                onTap: _openAiAssistant,
+                                child: Container(
+                                  height: 52,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(30),
+                                    border: Border.all(
+                                      color: Colors.grey.shade300,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.search,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'What service do you need ?',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE30613).withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.auto_awesome,
+                                              size: 13,
+                                              color: Color(0xFFE30613),
+                                            ),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              'AI',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFFE30613),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.search,
-                                      color: Colors.grey.shade500,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            // AI Assistant Banner Card
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: _openAiAssistant,
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        const Color(0xFFE30613).withValues(alpha: 0.08),
+                                        const Color(0xFFE30613).withValues(alpha: 0.03),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
                                     ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'What service do you need ?',
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        color: Colors.grey.shade500,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: const Color(0xFFE30613).withValues(alpha: 0.25),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE30613),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Icon(
+                                          Icons.auto_awesome,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 12),
+                                      const Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'AI Problem Assistant',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF1E293B),
+                                              ),
+                                            ),
+                                            SizedBox(height: 2),
+                                            Text(
+                                              'Describe breakdown symptoms in plain words',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.chevron_right,
+                                        color: Color(0xFFE30613),
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),

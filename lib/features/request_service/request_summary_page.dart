@@ -43,6 +43,12 @@ class RequestSummaryPage extends StatefulWidget {
   final int? durationMin;
   final Vehicle? vehicle;
   final double searchRadiusKm;
+  final String? initialNotes;
+  final String? aiProblemDescription;
+  final String? aiSuggestedCategory;
+  final String? aiConfirmedCategory;
+  final double? aiConfidence;
+  final String? aiModelVersion;
 
   const RequestSummaryPage({
     super.key,
@@ -58,6 +64,12 @@ class RequestSummaryPage extends StatefulWidget {
     this.durationMin,
     this.vehicle,
     this.searchRadiusKm = 5.0,
+    this.initialNotes,
+    this.aiProblemDescription,
+    this.aiSuggestedCategory,
+    this.aiConfirmedCategory,
+    this.aiConfidence,
+    this.aiModelVersion,
   });
 
   @override
@@ -74,9 +86,15 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
   static const double _flatTireFee = 1530;
   static const double _batteryFee = 2340;
 
-  String _notes = '';
+  late String _notes;
   _PaymentMethod _paymentMethod = _PaymentMethod.cash; // cash is the default
   bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _notes = widget.initialNotes ?? '';
+  }
 
   bool get _isFuel => widget.serviceType == ServiceType.fuelDelivery;
 
@@ -651,6 +669,11 @@ class _RequestSummaryPageState extends State<RequestSummaryPage> {
         paymentMethod: _paymentMethod.name,
         searchRadiusKm: widget.searchRadiusKm,
         expiresAt: DateTime.now().add(kSearchTimeout),
+        aiProblemDescription: widget.aiProblemDescription,
+        aiSuggestedCategory: widget.aiSuggestedCategory,
+        aiConfirmedCategory: widget.aiConfirmedCategory,
+        aiConfidence: widget.aiConfidence,
+        aiModelVersion: widget.aiModelVersion,
       );
 
       final requestId = await createServiceRequest(request);

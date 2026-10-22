@@ -1,0 +1,34 @@
+{
+  "model_name": "Logistic Regression",
+  "classes": [
+    "battery_boost",
+    "flat_tire",
+    "fuel_delivery",
+    "mechanic",
+    "tow_truck",
+    "uncertain"
+  ],
+  "accuracy": 0.8214285714285714,
+  "macro_f1": 0.8107744107744108,
+  "train_samples": 81,
+  "test_samples": 28,
+  "vectorizer_features": 1051,
+  "comparison": {
+    "logistic_regression": {
+      "accuracy": 0.8214285714285714,
+      "macro_f1": 0.8107744107744108
+    },
+    "calibrated_linear_svm": {
+      "accuracy": 0.8214285714285714,
+      "macro_f1": 0.8107744107744108
+    }
+  },
+  "taxonomy_mapping": {
+    "battery_boost": "batteryBoost",
+    "flat_tire": "flatTireChange",
+    "fuel_delivery": "fuelDelivery",
+    "mechanic": "mechanic",
+    "tow_truck": "towTruck",
+    "uncertain": "uncertain"
+  }
+}

@@ -202,11 +202,23 @@ enum _Phase { pickingPickup, pickingDropoff, details }
 class RequestServicePage extends StatefulWidget {
   final ServiceType serviceType;
   final UserType userType;
+  final String? initialNotes;
+  final Vehicle? initialVehicle;
+  final String? aiProblemDescription;
+  final String? aiSuggestedCategory;
+  final double? aiConfidence;
+  final String? aiModelVersion;
 
   const RequestServicePage({
     super.key,
     required this.serviceType,
     this.userType = UserType.driver,
+    this.initialNotes,
+    this.initialVehicle,
+    this.aiProblemDescription,
+    this.aiSuggestedCategory,
+    this.aiConfidence,
+    this.aiModelVersion,
   });
 
   @override
@@ -1641,6 +1653,11 @@ class _RequestServicePageState extends State<RequestServicePage>
 
   /// Loads the logged-in user's active vehicle (if any) on page load.
   Future<void> _loadActiveVehicle() async {
+    if (widget.initialVehicle != null) {
+      _vehicle = widget.initialVehicle;
+      _loadingVehicle = false;
+      return;
+    }
     if (!_usesVehicle) {
       _loadingVehicle = false;
       return;
@@ -1780,6 +1797,12 @@ class _RequestServicePageState extends State<RequestServicePage>
             durationMin: _durationMin,
             vehicle: _vehicle,
             searchRadiusKm: _initialSearchRadiusKm,
+            initialNotes: widget.initialNotes,
+            aiProblemDescription: widget.aiProblemDescription,
+            aiSuggestedCategory: widget.aiSuggestedCategory,
+            aiConfirmedCategory: widget.serviceType.name,
+            aiConfidence: widget.aiConfidence,
+            aiModelVersion: widget.aiModelVersion,
           ),
         ),
       );
@@ -1798,6 +1821,12 @@ class _RequestServicePageState extends State<RequestServicePage>
                 ? (_fuelType == _FuelType.petrol ? 'Petrol' : 'Diesel')
                 : null,
             searchRadiusKm: _initialSearchRadiusKm,
+            initialNotes: widget.initialNotes,
+            aiProblemDescription: widget.aiProblemDescription,
+            aiSuggestedCategory: widget.aiSuggestedCategory,
+            aiConfirmedCategory: widget.serviceType.name,
+            aiConfidence: widget.aiConfidence,
+            aiModelVersion: widget.aiModelVersion,
           ),
         ),
       );
