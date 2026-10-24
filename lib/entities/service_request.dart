@@ -85,6 +85,13 @@ class ServiceRequest {
   final DateTime? createdAt;
   final DateTime expiresAt;
 
+  // Optional AI metadata (backward-compatible)
+  final String? aiProblemDescription;
+  final String? aiSuggestedCategory;
+  final String? aiConfirmedCategory;
+  final double? aiConfidence;
+  final String? aiModelVersion;
+
   const ServiceRequest({
     this.id = '',
     required this.customerUid,
@@ -112,6 +119,11 @@ class ServiceRequest {
     this.searchRadiusKm = 5,
     this.createdAt,
     required this.expiresAt,
+    this.aiProblemDescription,
+    this.aiSuggestedCategory,
+    this.aiConfirmedCategory,
+    this.aiConfidence,
+    this.aiModelVersion,
   });
 
   factory ServiceRequest.fromMap(String id, Map<String, dynamic> map) {
@@ -150,6 +162,11 @@ class ServiceRequest {
       searchRadiusKm: (map['searchRadiusKm'] as num?)?.toDouble() ?? 5,
       createdAt: ts(map['createdAt']),
       expiresAt: ts(map['expiresAt']) ?? DateTime.now(),
+      aiProblemDescription: map['aiProblemDescription'] as String?,
+      aiSuggestedCategory: map['aiSuggestedCategory'] as String?,
+      aiConfirmedCategory: map['aiConfirmedCategory'] as String?,
+      aiConfidence: (map['aiConfidence'] as num?)?.toDouble(),
+      aiModelVersion: map['aiModelVersion'] as String?,
     );
   }
 
@@ -176,6 +193,11 @@ class ServiceRequest {
     'searchRadiusKm': searchRadiusKm,
     'createdAt': FieldValue.serverTimestamp(),
     'expiresAt': Timestamp.fromDate(expiresAt),
+    if (aiProblemDescription != null) 'aiProblemDescription': aiProblemDescription,
+    if (aiSuggestedCategory != null) 'aiSuggestedCategory': aiSuggestedCategory,
+    if (aiConfirmedCategory != null) 'aiConfirmedCategory': aiConfirmedCategory,
+    if (aiConfidence != null) 'aiConfidence': aiConfidence,
+    if (aiModelVersion != null) 'aiModelVersion': aiModelVersion,
   };
 
   /// e.g. "Toyota Aqua · ABC-1234", or null if no vehicle was attached.
